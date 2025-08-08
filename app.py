@@ -76,13 +76,6 @@ def main():
     .main-content {
         padding: 0 20px;
     }
-    .right-sidebar {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 10px;
-        height: 100vh;
-        overflow-y: auto;
-    }
     .thumbnail-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -182,10 +175,21 @@ def main():
         st.markdown('</div>', unsafe_allow_html=True)
     
     with col_right:
-        st.markdown('<div class="right-sidebar">', unsafe_allow_html=True)
+        # Apply styling to the container
+        st.markdown("""
+        <style>
+        div[data-testid="column"]:last-child > div {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        </style>
+        """, unsafe_allow_html=True)
         # Right sidebar for thumbnails
-        thumbnail_sidebar()
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.container():
+            thumbnail_sidebar()
     
     # Background task status
     if st.session_state.processing_tasks:
