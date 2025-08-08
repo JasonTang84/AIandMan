@@ -20,13 +20,13 @@ AIandMan is an interactive tool that allows users to generate and modify images 
 - Generate unique images for each prompt using GPT-IMAGE-1
 - Process multiple prompts in parallel for efficient workflow
 
-#### 2. Image Modification
-- Upload existing images for AI-powered enhancement or modification
-- Apply default prompts or custom modifications to uploaded images
-- Maintain original image context while applying transformations
+#### 2. Image-to-Image Transformation
+- Upload existing images for AI-powered transformation and enhancement
+- Apply custom transformation prompts to uploaded images
+- Maintain original image context while applying creative transformations
 
 #### 3. Parallel Processing
-- All image generation and modification tasks run concurrently
+- All image generation and transformation tasks run concurrently
 - Efficient resource utilization for faster results
 - Background processing for seamless user experience
 
@@ -34,7 +34,7 @@ AIandMan is an interactive tool that allows users to generate and modify images 
 If input is an image, showing before/after image; If input is a prompt, showing image with prompt. Then let user to decide
 - **Accept**: Save approved images to configured output folder
 - **Reject**: Discard unwanted images without saving
-- **Modify**: Provide additional prompts for image regeneration (queued in background)
+- **Modify**: Provide additional prompts for image transformation (queued in background)
 
 #### 5. Queue Management
 - Organized queue system for reviewing multiple generated images
@@ -50,9 +50,9 @@ If input is an image, showing before/after image; If input is a prompt, showing 
 ## Workflow
 
 1. **Input**: Upload text file with prompts or image files
-2. **Processing**: AI generates/modifies images in parallel
+2. **Processing**: AI generates/transforms images in parallel
 3. **Review**: Sequential presentation of generated images
-4. **Decision**: Accept, reject, or request modifications for each image
+4. **Decision**: Accept, reject, or request transformations for each image
 5. **Output**: Approved images saved to user-configured directory
 
 ## Technical Stack

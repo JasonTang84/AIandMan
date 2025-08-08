@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AIandMan is a Streamlit-based application for AI image generation and human curation using GPT-Image-1. The tool supports batch text-to-image generation and image-to-image modification with interactive review capabilities.
+AIandMan is a Streamlit-based application for AI image generation and human curation using GPT-Image-1. The tool supports batch text-to-image generation and image-to-image transformation with interactive review capabilities.
 
 ## Architecture
 
@@ -17,7 +17,7 @@ AIandMan is a Streamlit-based application for AI image generation and human cura
 
 ### Key Workflows
 1. **Text-to-Image**: Parse semicolon-separated prompts from text files → parallel generation → sequential review
-2. **Image-to-Image**: Upload images → apply modifications → side-by-side comparison → review
+2. **Image-to-Image**: Upload images → apply transformations → side-by-side comparison → review
 3. **Queue Processing**: Background generation with real-time status updates and statistics
 
 ## Development Setup
@@ -33,6 +33,12 @@ AIandMan is a Streamlit-based application for AI image generation and human cura
 - Run application: `streamlit run app.py`
 - Or use the launcher: `python run.py`
 - Development with auto-reload: `streamlit run app.py --reload`
+- App will be available at: http://localhost:8502
+
+### New UI Layout
+- **Left Sidebar**: Contains all input workflows (Text-to-Image and Image-to-Image) plus configuration and statistics
+- **Main Area**: Dedicated to the review queue and user interactions (Accept/Reject/Redo)
+- **Queue Management**: Sequential review with preview of upcoming images
 
 ## Implementation Notes
 
