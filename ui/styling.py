@@ -1,0 +1,116 @@
+"""
+UI styling and layout configuration.
+"""
+import streamlit as st
+
+
+def apply_page_config():
+    """Apply page configuration settings"""
+    st.set_page_config(
+        page_title="AIandMan", 
+        page_icon="🎨", 
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+
+
+def apply_custom_css():
+    """Apply custom CSS styling for the application"""
+    st.markdown("""
+    <style>
+    .css-1d391kg {
+        width: 400px;
+    }
+    .css-1lcbmhc {
+        max-width: 400px;
+    }
+    .st-emotion-cache-1legitb {
+        max-width: 400px;
+        min-width: 400px;
+    }
+    section[data-testid="stSidebar"] {
+        width: 400px !important;
+    }
+    section[data-testid="stSidebar"] > div {
+        width: 400px !important;
+    }
+    .main-content {
+        padding: 0 20px;
+    }
+    .thumbnail-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-top: 10px;
+    }
+    .thumbnail-item {
+        position: relative;
+        border: 3px solid transparent;
+        border-radius: 12px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+    .thumbnail-item:hover {
+        border-color: #ff6b6b;
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .thumbnail-item.selected {
+        border-color: #4CAF50;
+        box-shadow: 0 0 15px rgba(76, 175, 80, 0.6);
+        transform: scale(1.02);
+    }
+    .thumbnail-item.generating {
+        border-color: #ffa726;
+        opacity: 0.7;
+    }
+    .thumbnail-status {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 2px solid white;
+        z-index: 10;
+    }
+    .status-generating { background-color: #ffa726; }
+    .status-ready { background-color: #4CAF50; }
+    .status-reviewing { background-color: #2196F3; }
+    .thumbnail-caption {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent, rgba(0,0,0,0.8));
+        color: white;
+        padding: 8px;
+        font-size: 12px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+def render_background_task_status():
+    """Render background task status indicator"""
+    if st.session_state.background_futures:
+        active_tasks = len(st.session_state.background_futures)
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.info(f"🔄 Generating {active_tasks} images in background...")
+        with col2:
+            if st.button("🔄 Refresh", help="Check for completed images"):
+                st.rerun()
+        
+        # Show progress in the bottom
+        generating_count = st.session_state.image_states.count('generating')
+        if generating_count > 0:
+            progress_container = st.container()
+            with progress_container:
+                completed_count = len([item for item in st.session_state.review_queue if item['image'] is not None])
+                total_count = len(st.session_state.review_queue)
+                if total_count > 0:
+                    progress = completed_count / total_count
+                    st.progress(progress, text=f"Generated {completed_count}/{total_count} images")
