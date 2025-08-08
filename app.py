@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1
 import os
 from dotenv import load_dotenv
 from typing import List, Dict, Any
@@ -23,6 +24,9 @@ if 'review_queue' not in st.session_state:
 if 'processing_tasks' not in st.session_state:
     st.session_state.processing_tasks = []
 
+if 'background_futures' not in st.session_state:
+    st.session_state.background_futures = []
+
 if 'output_folder' not in st.session_state:
     st.session_state.output_folder = os.getenv('OUTPUT_FOLDER', './output')
 
@@ -35,6 +39,9 @@ if 'image_states' not in st.session_state:
 if 'generation_logs' not in st.session_state:
     st.session_state.generation_logs = []
 
+if 'executor' not in st.session_state:
+    st.session_state.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+
 def add_log(message):
     """Add a log message to session state and print to console"""
     import datetime
@@ -46,6 +53,44 @@ def add_log(message):
     if len(st.session_state.generation_logs) > 50:
         st.session_state.generation_logs = st.session_state.generation_logs[-50:]
 
+def check_background_tasks():
+    """Check and update completed background generation tasks"""
+    if not st.session_state.background_futures:
+        return False
+    
+    completed_any = False
+    remaining_futures = []
+    
+    for future_info in st.session_state.background_futures:
+        future = future_info['future']
+        if future.done():
+            try:
+                image = future.result()
+                queue_index = future_info['queue_index']
+                prompt = future_info['prompt']
+                
+                if image and queue_index < len(st.session_state.review_queue):
+                    # Update the existing item with the generated image
+                    st.session_state.review_queue[queue_index]['image'] = image
+                    st.session_state.review_queue[queue_index]['status'] = 'ready'
+                    if queue_index < len(st.session_state.image_states):
+                        st.session_state.image_states[queue_index] = 'ready'
+                    st.session_state.stats['generated'] += 1
+                    add_log(f"✅ Completed: {prompt[:40]}...")
+                    completed_any = True
+            except Exception as e:
+                queue_index = future_info['queue_index']
+                prompt = future_info['prompt']
+                add_log(f"❌ Failed: {prompt[:40]}... - {str(e)}")
+                # Mark as failed
+                if queue_index < len(st.session_state.image_states):
+                    st.session_state.image_states[queue_index] = 'failed'
+        else:
+            remaining_futures.append(future_info)
+    
+    st.session_state.background_futures = remaining_futures
+    return completed_any
+
 def main():
     st.set_page_config(
         page_title="AIandMan", 
@@ -53,6 +98,21 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
+    
+    # Check for completed background tasks on each run
+    if check_background_tasks():
+        st.rerun()
+    
+    # Auto-refresh using JavaScript timer when there are background tasks
+    if st.session_state.background_futures:
+        # Inject JavaScript that refreshes the page every 3 seconds
+        st.components.v1.html("""
+        <script>
+        setTimeout(function(){
+            window.parent.location.reload();
+        }, 3000);
+        </script>
+        """, height=0)
     
     # Configure layout with CSS for three-column layout
     st.markdown("""
@@ -207,8 +267,38 @@ def main():
             thumbnail_sidebar()
     
     # Background task status
-    if st.session_state.processing_tasks:
-        st.info(f"🔄 Processing {len(st.session_state.processing_tasks)} tasks in background...")
+    if st.session_state.background_futures:
+        active_tasks = len(st.session_state.background_futures)
+        
+        # Create a prominent status bar
+        st.markdown(f"""
+        <div style="
+            background-color: #e3f2fd;
+            border-left: 5px solid #2196f3;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        ">
+            <strong>🔄 {active_tasks} images generating in background...</strong><br>
+            <small>Page will auto-refresh every 3 seconds to show completed images</small>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns([3, 1])
+        with col2:
+            if st.button("🔄 Refresh Now", help="Check for completed images immediately"):
+                st.rerun()
+        
+        # Show progress in the bottom
+        generating_count = st.session_state.image_states.count('generating')
+        if generating_count > 0:
+            progress_container = st.container()
+            with progress_container:
+                completed_count = len([item for item in st.session_state.review_queue if item['image'] is not None])
+                total_count = len(st.session_state.review_queue)
+                if total_count > 0:
+                    progress = completed_count / total_count
+                    st.progress(progress, text=f"Generated {completed_count}/{total_count} images")
 
 def text_to_image_interface():
     st.write("Upload a text file with prompts separated by semicolons (`;`)")
@@ -268,7 +358,24 @@ def main_content_area():
     
     # Check if the selected image is still generating
     if current_item['image'] is None:
-        st.warning("🔄 This image is still being generated. Please wait or select another image.")
+        st.info("🔄 This image is still being generated. Please wait or select another image.")
+        
+        # Show the prompt being generated
+        if current_item['type'] == 'text_to_image':
+            st.markdown("**🎨 Generating from prompt:**")
+            with st.container():
+                st.markdown(f"*\"{current_item['prompt']}\"*")
+        else:
+            st.markdown("**🖼️ Transforming image:**")
+            if current_item.get('original_image'):
+                st.image(current_item['original_image'], caption="Original", use_container_width=True)
+            if current_item.get('modification_prompt'):
+                st.markdown(f"**Transformation:** *{current_item['modification_prompt']}*")
+        
+        # Show spinner for generating state
+        with st.spinner("Generating image..."):
+            st.empty()
+        
         return
     
     # Header with navigation
@@ -351,12 +458,15 @@ def thumbnail_sidebar():
     total_images = len(st.session_state.review_queue)
     generating_count = st.session_state.image_states.count('generating')
     ready_count = st.session_state.image_states.count('ready')
+    failed_count = st.session_state.image_states.count('failed')
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Total", total_images)
     with col2:
         st.metric("Ready", ready_count)
+    with col3:
+        st.metric("Generating", generating_count)
     
     st.divider()
     
@@ -395,8 +505,34 @@ def thumbnail_sidebar():
             else:
                 # Show placeholder for generating images
                 with st.container():
-                    st.markdown("🔄 **Generating...**")
-                    st.empty()  # Placeholder space
+                    # Create a placeholder box
+                    st.markdown("""
+                    <div style="
+                        background-color: #f0f0f0;
+                        border: 2px dashed #ccc;
+                        height: 200px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: 8px;
+                        margin: 10px 0;
+                    ">
+                        <div style="text-align: center; color: #666;">
+                            <div style="font-size: 24px;">🔄</div>
+                            <div style="font-size: 14px;">Processing...</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Still allow clicking on generating images
+                    if st.button(
+                        "🔄 View Progress",
+                        key=f"gen_btn_{i}",
+                        help=f"View generation progress",
+                        use_container_width=True
+                    ):
+                        st.session_state.selected_image_index = i
+                        st.rerun()
             
             # Show status indicator
             if status == 'generating':
@@ -416,7 +552,7 @@ def thumbnail_sidebar():
                 st.markdown("---")
 
 def generate_from_prompts(prompts: List[str]):
-    """Generate images from text prompts in parallel"""
+    """Generate images from text prompts in background (non-blocking)"""
     # Clear previous logs
     st.session_state.generation_logs = []
     
@@ -446,58 +582,35 @@ def generate_from_prompts(prompts: List[str]):
     
     add_log(f"📊 Queue now has {len(st.session_state.review_queue)} items")
     
-    # DON'T rerun immediately - let the function continue
+    # Submit background tasks without waiting
+    add_log(f"🔄 Starting background generation for {len(prompts)} tasks...")
     
-    # Add tasks to processing queue
-    add_log(f"🔄 Starting parallel execution with {len(prompts)} tasks...")
+    for i, prompt in enumerate(prompts):
+        queue_index = len(st.session_state.review_queue) - len(prompts) + i
+        add_log(f"🎯 Submitting background task {i+1}: {prompt[:30]}...")
+        future = st.session_state.executor.submit(ai_generator.generate_from_text, prompt)
+        
+        # Store future info for background checking
+        st.session_state.background_futures.append({
+            'future': future,
+            'prompt': prompt,
+            'queue_index': queue_index,
+            'type': 'text_to_image'
+        })
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        add_log("📋 Creating futures...")
-        futures = []
-        for i, prompt in enumerate(prompts):
-            queue_index = len(st.session_state.review_queue) - len(prompts) + i
-            add_log(f"🎯 Submitting task {i+1}: {prompt[:30]}...")
-            future = executor.submit(ai_generator.generate_from_text, prompt)
-            futures.append((future, prompt, queue_index))
-        
-        add_log(f"✅ All {len(futures)} tasks submitted to executor")
-        
-        # Process completed tasks
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        completed = 0
-        
-        add_log("⏳ Waiting for task completion...")
-        for future in concurrent.futures.as_completed([f for f, _, _ in futures]):
-            prompt, queue_index = next((p, qi) for f, p, qi in futures if f == future)
-            add_log(f"📥 Task completed for: {prompt[:30]}...")
-            try:
-                status_text.info(f"🎨 Processing: {prompt[:40]}...")
-                image = future.result()
-                if image and queue_index < len(st.session_state.review_queue):
-                    # Update the existing item with the generated image
-                    st.session_state.review_queue[queue_index]['image'] = image
-                    st.session_state.review_queue[queue_index]['status'] = 'ready'
-                    if queue_index < len(st.session_state.image_states):
-                        st.session_state.image_states[queue_index] = 'ready'
-                    st.session_state.stats['generated'] += 1
-                completed += 1
-                progress_bar.progress(completed / len(prompts))
-                status_text.success(f"✅ Completed {completed}/{len(prompts)} images")
-            except Exception as e:
-                st.error(f"Error generating image for prompt: {prompt[:50]}... - {str(e)}")
-                # Mark as failed
-                if queue_index < len(st.session_state.image_states):
-                    st.session_state.image_states[queue_index] = 'failed'
-                completed += 1
-                progress_bar.progress(completed / len(prompts))
+    add_log(f"✅ All {len(prompts)} tasks submitted to background executor")
+    st.success(f"🎨 Started generating {len(prompts)} images in background! Images will appear in the gallery as they complete.")
     
-    st.success(f"Generated {len(prompts)} images! Check the thumbnail gallery on the right.")
+    # Immediately rerun to show the placeholder images
     st.rerun()
 
 def process_images(uploaded_files, modification_prompt: str):
-    """Process uploaded images with AI transformation"""
-    ai_generator = AIImageGenerator()
+    """Process uploaded images with AI transformation in background (non-blocking)"""
+    try:
+        ai_generator = AIImageGenerator()
+    except Exception as e:
+        st.error(f"Failed to initialize AI Generator: {str(e)}")
+        return
     
     # Add placeholder items with 'generating' status
     for uploaded_file in uploaded_files:
@@ -513,34 +626,26 @@ def process_images(uploaded_files, modification_prompt: str):
         })
         st.session_state.image_states.append('generating')
     
-    st.info(f"Started processing {len(uploaded_files)} images...")
-    st.rerun()
+    add_log(f"🔄 Starting background processing for {len(uploaded_files)} images...")
     
-    progress_bar = st.progress(0)
-    
+    # Submit background tasks without waiting
     for i, uploaded_file in enumerate(uploaded_files):
         queue_index = len(st.session_state.review_queue) - len(uploaded_files) + i
-        try:
-            original_image = Image.open(uploaded_file)
-            modified_image = ai_generator.modify_image(original_image, modification_prompt)
-            
-            if modified_image and queue_index < len(st.session_state.review_queue):
-                # Update the existing item with the generated image
-                st.session_state.review_queue[queue_index]['image'] = modified_image
-                st.session_state.review_queue[queue_index]['status'] = 'ready'
-                if queue_index < len(st.session_state.image_states):
-                    st.session_state.image_states[queue_index] = 'ready'
-                st.session_state.stats['generated'] += 1
+        original_image = Image.open(uploaded_file)
         
-        except Exception as e:
-            st.error(f"Error processing {uploaded_file.name}: {str(e)}")
-            # Mark as failed
-            if queue_index < len(st.session_state.image_states):
-                st.session_state.image_states[queue_index] = 'failed'
+        future = st.session_state.executor.submit(ai_generator.modify_image, original_image, modification_prompt)
         
-        progress_bar.progress((i + 1) / len(uploaded_files))
+        # Store future info for background checking
+        st.session_state.background_futures.append({
+            'future': future,
+            'prompt': f"Transform {uploaded_file.name}",
+            'queue_index': queue_index,
+            'type': 'image_to_image'
+        })
+        
+        add_log(f"🎯 Submitted background task for: {uploaded_file.name}")
     
-    st.success(f"Transformed {len(uploaded_files)} images! Check the thumbnail gallery on the right.")
+    st.success(f"🖼️ Started processing {len(uploaded_files)} images in background! Results will appear as they complete.")
     st.rerun()
 
 def accept_image(current_item):
@@ -624,43 +729,63 @@ def skip_current_image():
         st.rerun()
 
 def modify_image(current_item, modify_prompt: str):
-    """Request transformation of the current image"""
-    ai_generator = AIImageGenerator()
-    
+    """Request transformation of the current image (non-blocking)"""
     try:
-        if current_item['type'] == 'text_to_image':
-            # Combine original prompt with transformation
-            new_prompt = f"{current_item['prompt']} {modify_prompt}"
-            new_image = ai_generator.generate_from_text(new_prompt)
-        else:
-            # Transform the original image with new prompt
-            new_image = ai_generator.modify_image(current_item['original_image'], modify_prompt)
-        
-        if new_image:
-            # Add to queue and mark current for removal
-            st.session_state.review_queue.append({
-                **current_item,
-                'image': new_image,
-                'timestamp': time.time()
-            })
-            st.session_state.image_states.append('ready')
-            
-            # Remove current image
-            current_index = st.session_state.selected_image_index
-            st.session_state.review_queue.pop(current_index)
-            if current_index < len(st.session_state.image_states):
-                st.session_state.image_states.pop(current_index)
-            
-            st.session_state.stats['generated'] += 1
-            
-            # Select the newly added image (now at the end)
-            st.session_state.selected_image_index = len(st.session_state.review_queue) - 1
-            
-            st.success("Image transformed! New version selected.")
-            st.rerun()
-    
+        ai_generator = AIImageGenerator()
     except Exception as e:
-        st.error(f"Error transforming image: {str(e)}")
+        st.error(f"Failed to initialize AI Generator: {str(e)}")
+        return
+    
+    # Create a placeholder for the new transformed image
+    new_item = {
+        **current_item,
+        'image': None,  # Will be filled when generation completes
+        'timestamp': time.time(),
+        'status': 'generating'
+    }
+    
+    # Update prompts based on type
+    if current_item['type'] == 'text_to_image':
+        # Combine original prompt with transformation
+        new_item['prompt'] = f"{current_item['prompt']} {modify_prompt}"
+        task_description = f"Transform text: {new_item['prompt'][:40]}..."
+    else:
+        # Keep modification prompt for image transformation
+        new_item['modification_prompt'] = modify_prompt
+        task_description = f"Transform image: {modify_prompt[:40]}..."
+    
+    # Add placeholder to queue
+    st.session_state.review_queue.append(new_item)
+    st.session_state.image_states.append('generating')
+    
+    # Submit background task
+    queue_index = len(st.session_state.review_queue) - 1
+    
+    if current_item['type'] == 'text_to_image':
+        future = st.session_state.executor.submit(ai_generator.generate_from_text, new_item['prompt'])
+    else:
+        future = st.session_state.executor.submit(ai_generator.modify_image, current_item['original_image'], modify_prompt)
+    
+    # Store future info for background checking
+    st.session_state.background_futures.append({
+        'future': future,
+        'prompt': task_description,
+        'queue_index': queue_index,
+        'type': current_item['type']
+    })
+    
+    # Remove current image from queue
+    current_index = st.session_state.selected_image_index
+    st.session_state.review_queue.pop(current_index)
+    if current_index < len(st.session_state.image_states):
+        st.session_state.image_states.pop(current_index)
+    
+    # Select the newly added image (now at the end)
+    st.session_state.selected_image_index = len(st.session_state.review_queue) - 1
+    
+    add_log(f"🔄 Started transformation: {task_description}")
+    st.success("🔄 Transformation started! The new image will appear when ready.")
+    st.rerun()
 
 if __name__ == "__main__":
     main()
