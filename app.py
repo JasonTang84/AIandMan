@@ -280,13 +280,13 @@ def main_content_area():
         else:
             st.markdown("**📸 Original Image:**")
             if current_item.get('original_image'):
-                st.image(current_item['original_image'], caption="Original", use_column_width=True)
+                st.image(current_item['original_image'], caption="Original", use_container_width=True)
             if current_item.get('modification_prompt'):
                 st.markdown(f"**Transformation:** *{current_item['modification_prompt']}*")
     
     with col2:
         st.markdown("**✨ Generated Result:**")
-        st.image(current_item['image'], caption="Generated", use_column_width=True)
+        st.image(current_item['image'], caption="Generated", use_container_width=True)
     
     st.divider()
     
@@ -370,7 +370,7 @@ def thumbnail_sidebar():
                 st.markdown("🟢 **Selected**")
             
             if item['image'] is not None:
-                st.image(item['image'], use_column_width=True)
+                st.image(item['image'], use_container_width=True)
             else:
                 # Show placeholder for generating images
                 st.markdown("🔄 **Generating...**")
