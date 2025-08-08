@@ -16,7 +16,7 @@ def render_thumbnail_sidebar():
     <style>
     div[data-testid="column"]:last-child > div {
         background-color: #f8f9fa;
-        padding: 10px;
+        padding: 3px;
         border-radius: 8px;
         height: 100vh;
         overflow-y: auto;
@@ -30,39 +30,101 @@ def render_thumbnail_sidebar():
         flex-basis: 140px !important;
     }
     
-    /* Reduce spacing between elements in right sidebar */
+    /* ELIMINATE ALL VERTICAL GAPS */
     div[data-testid="column"]:last-child .stMarkdown {
-        margin-bottom: 0.1rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
     }
     
     div[data-testid="column"]:last-child .stMarkdown p {
-        margin-bottom: 0.1rem !important;
-        font-size: 0.8rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 0.7rem !important;
+        line-height: 1 !important;
     }
     
-    /* Reduce spacing around images */
+    /* Remove all image spacing */
     div[data-testid="column"]:last-child .stImage {
-        margin-bottom: 0.25rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     
-    /* Reduce button spacing and size */
+    /* Remove all button spacing */
     div[data-testid="column"]:last-child .stButton {
-        margin-bottom: 0.1rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     
     div[data-testid="column"]:last-child .stButton button {
-        font-size: 0.7rem !important;
-        padding: 0.2rem !important;
+        font-size: 0.6rem !important;
+        padding: 0.1rem !important;
+        height: 18px !important;
+        min-height: 18px !important;
+        margin: 0 !important;
     }
     
-    /* Make containers more compact */
+    /* Zero gaps in containers */
+    div[data-testid="column"]:last-child .stContainer {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
     div[data-testid="column"]:last-child .stContainer > div {
-        gap: 0.1rem !important;
+        gap: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     
-    /* Smaller text for captions */
+    /* Zero spacing for captions */
     div[data-testid="column"]:last-child .stCaptionContainer {
-        font-size: 0.7rem !important;
+        font-size: 0.6rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
+    }
+    
+    /* Zero spacing for all vertical blocks */
+    div[data-testid="column"]:last-child .stVerticalBlock {
+        gap: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Zero spacing for metrics */
+    div[data-testid="column"]:last-child .stMetric {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 0.6rem !important;
+    }
+    
+    /* Zero spacing for headers */
+    div[data-testid="column"]:last-child h1,
+    div[data-testid="column"]:last-child h2,
+    div[data-testid="column"]:last-child h3,
+    div[data-testid="column"]:last-child h4 {
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
+        font-size: 0.8rem !important;
+    }
+    
+    /* Target ALL Streamlit elements for zero spacing */
+    div[data-testid="column"]:last-child [data-testid*="element"] {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    div[data-testid="column"]:last-child .element-container {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Remove gaps from flex containers */
+    div[data-testid="column"]:last-child div[class*="emotion-cache"] {
+        gap: 0 !important;
+        row-gap: 0 !important;
+        column-gap: 0 !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -82,7 +144,8 @@ def thumbnail_gallery():
     # Statistics at top
     render_gallery_stats()
     
-    st.divider()
+    # Ultra-minimal divider
+    st.markdown("<hr style='margin:0; padding:0; height:1px; border:none; background:#ccc;'>", unsafe_allow_html=True)
     
     # Thumbnail column
     st.markdown("**Click image to select:**")
@@ -135,9 +198,9 @@ def render_thumbnail_item(i, item):
         # Show truncated prompt
         render_thumbnail_caption(item)
         
-        # Add minimal spacing between thumbnails (smaller gap)
+        # Ultra-minimal spacing between thumbnails
         if i < len(st.session_state.review_queue) - 1:  # Don't add divider after last item
-            st.markdown("<div style='margin: 5px 0; border-bottom: 1px solid #e0e0e0;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin:0; padding:0; height:1px; border-bottom:1px solid #e0e0e0;'></div>", unsafe_allow_html=True)
 
 
 def render_ready_thumbnail(i, item):
