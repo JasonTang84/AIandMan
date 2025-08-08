@@ -37,7 +37,8 @@ def main():
         render_sidebar()
     
     # Main layout with two columns: main content (left), thumbnail sidebar (right)
-    col_main, col_right = st.columns([3, 1])
+    # Making right sidebar more compact
+    col_main, col_right = st.columns([4, 0.8])
     
     with col_main:
         render_main_content()

@@ -16,34 +16,53 @@ def render_thumbnail_sidebar():
     <style>
     div[data-testid="column"]:last-child > div {
         background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 10px;
+        padding: 10px;
+        border-radius: 8px;
         height: 100vh;
         overflow-y: auto;
+        max-width: 140px;
+        min-width: 120px;
+    }
+    
+    /* Make right sidebar more compact */
+    div[data-testid="column"]:last-child {
+        max-width: 140px !important;
+        flex-basis: 140px !important;
     }
     
     /* Reduce spacing between elements in right sidebar */
     div[data-testid="column"]:last-child .stMarkdown {
-        margin-bottom: 0.25rem !important;
+        margin-bottom: 0.1rem !important;
     }
     
     div[data-testid="column"]:last-child .stMarkdown p {
-        margin-bottom: 0.25rem !important;
+        margin-bottom: 0.1rem !important;
+        font-size: 0.8rem !important;
     }
     
     /* Reduce spacing around images */
     div[data-testid="column"]:last-child .stImage {
-        margin-bottom: 0.5rem !important;
+        margin-bottom: 0.25rem !important;
     }
     
-    /* Reduce button spacing */
+    /* Reduce button spacing and size */
     div[data-testid="column"]:last-child .stButton {
-        margin-bottom: 0.25rem !important;
+        margin-bottom: 0.1rem !important;
+    }
+    
+    div[data-testid="column"]:last-child .stButton button {
+        font-size: 0.7rem !important;
+        padding: 0.2rem !important;
     }
     
     /* Make containers more compact */
     div[data-testid="column"]:last-child .stContainer > div {
-        gap: 0.25rem !important;
+        gap: 0.1rem !important;
+    }
+    
+    /* Smaller text for captions */
+    div[data-testid="column"]:last-child .stCaptionContainer {
+        font-size: 0.7rem !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -123,20 +142,19 @@ def render_thumbnail_item(i, item):
 
 def render_ready_thumbnail(i, item):
     """Render thumbnail for a ready image"""
-    col1, col2, col3 = st.columns([0.1, 0.8, 0.1])
-    with col2:
-        # Display the image
-        st.image(item['image'], use_container_width=True)
-        
-        # Invisible button that covers the image area
-        if st.button(
-            "📷",
-            key=f"img_btn_{i}",
-            help=f"Select this image",
-            use_container_width=True
-        ):
-            st.session_state.selected_image_index = i
-            st.rerun()
+    # Use full width for more compact display
+    # Display the image
+    st.image(item['image'], use_container_width=True)
+    
+    # Compact button that covers the image area
+    if st.button(
+        "Select",
+        key=f"img_btn_{i}",
+        help=f"Select this image",
+        use_container_width=True
+    ):
+        st.session_state.selected_image_index = i
+        st.rerun()
 
 
 def render_generating_thumbnail(i, item):
@@ -146,24 +164,24 @@ def render_generating_thumbnail(i, item):
         st.markdown("""
         <div style="
             background-color: #f0f0f0;
-            border: 2px dashed #ccc;
-            height: 150px;
+            border: 1px dashed #ccc;
+            height: 100px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 8px;
-            margin: 2px 0;
+            border-radius: 6px;
+            margin: 1px 0;
         ">
             <div style="text-align: center; color: #666;">
-                <div style="font-size: 20px;">🔄</div>
-                <div style="font-size: 12px;">Processing...</div>
+                <div style="font-size: 16px;">🔄</div>
+                <div style="font-size: 10px;">Processing...</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Still allow clicking on generating images
+        # Compact button for generating images
         if st.button(
-            "🔄 View Progress",
+            "View",
             key=f"gen_btn_{i}",
             help=f"View generation progress",
             use_container_width=True
@@ -175,10 +193,14 @@ def render_generating_thumbnail(i, item):
 def render_thumbnail_caption(item):
     """Render caption for thumbnail"""
     if item['type'] == 'text_to_image':
-        prompt_preview = item['prompt'][:40] + "..." if len(item['prompt']) > 40 else item['prompt']
-        st.caption(f"📝 {prompt_preview}")
+        # Much shorter prompt preview for compact display
+        prompt_preview = item['prompt'][:20] + "..." if len(item['prompt']) > 20 else item['prompt']
+        st.caption(f"{prompt_preview}")
     else:
-        st.caption(f"🖼️ {item.get('original_filename', 'Image')}")
+        # Just filename without icon for compact display
+        filename = item.get('original_filename', 'Image')
+        short_filename = filename[:15] + "..." if len(filename) > 15 else filename
+        st.caption(f"{short_filename}")
 
 
 def load_mock_images():
