@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1
 import os
 from dotenv import load_dotenv
 from typing import List, Dict, Any
@@ -102,17 +101,6 @@ def main():
     # Check for completed background tasks on each run
     if check_background_tasks():
         st.rerun()
-    
-    # Auto-refresh using JavaScript timer when there are background tasks
-    if st.session_state.background_futures:
-        # Inject JavaScript that refreshes the page every 3 seconds
-        st.components.v1.html("""
-        <script>
-        setTimeout(function(){
-            window.parent.location.reload();
-        }, 3000);
-        </script>
-        """, height=0)
     
     # Configure layout with CSS for three-column layout
     st.markdown("""
@@ -269,24 +257,11 @@ def main():
     # Background task status
     if st.session_state.background_futures:
         active_tasks = len(st.session_state.background_futures)
-        
-        # Create a prominent status bar
-        st.markdown(f"""
-        <div style="
-            background-color: #e3f2fd;
-            border-left: 5px solid #2196f3;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 5px;
-        ">
-            <strong>🔄 {active_tasks} images generating in background...</strong><br>
-            <small>Page will auto-refresh every 3 seconds to show completed images</small>
-        </div>
-        """, unsafe_allow_html=True)
-        
         col1, col2 = st.columns([3, 1])
+        with col1:
+            st.info(f"🔄 Generating {active_tasks} images in background...")
         with col2:
-            if st.button("🔄 Refresh Now", help="Check for completed images immediately"):
+            if st.button("🔄 Refresh", help="Check for completed images"):
                 st.rerun()
         
         # Show progress in the bottom
