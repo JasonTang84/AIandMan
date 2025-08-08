@@ -77,26 +77,29 @@ def main():
         padding: 0 20px;
     }
     .thumbnail-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-        gap: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
         margin-top: 10px;
     }
     .thumbnail-item {
         position: relative;
-        border: 2px solid transparent;
-        border-radius: 8px;
+        border: 3px solid transparent;
+        border-radius: 12px;
         overflow: hidden;
         cursor: pointer;
         transition: all 0.3s ease;
+        width: 100%;
     }
     .thumbnail-item:hover {
         border-color: #ff6b6b;
-        transform: scale(1.05);
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
     .thumbnail-item.selected {
         border-color: #4CAF50;
-        box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        box-shadow: 0 0 15px rgba(76, 175, 80, 0.6);
+        transform: scale(1.02);
     }
     .thumbnail-item.generating {
         border-color: #ffa726;
@@ -104,15 +107,27 @@ def main():
     }
     .thumbnail-status {
         position: absolute;
-        top: 5px;
-        right: 5px;
-        width: 12px;
-        height: 12px;
+        top: 8px;
+        right: 8px;
+        width: 16px;
+        height: 16px;
         border-radius: 50%;
+        border: 2px solid white;
+        z-index: 10;
     }
     .status-generating { background-color: #ffa726; }
     .status-ready { background-color: #4CAF50; }
     .status-reviewing { background-color: #2196F3; }
+    .thumbnail-caption {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(transparent, rgba(0,0,0,0.8));
+        color: white;
+        padding: 8px;
+        font-size: 12px;
+    }
     </style>
     """, unsafe_allow_html=True)
     
@@ -325,7 +340,7 @@ def main_content_area():
                 remove_current_image()
 
 def thumbnail_sidebar():
-    """Right sidebar showing thumbnail grid of all images"""
+    """Right sidebar showing thumbnail column of all images"""
     st.markdown("### 🖼️ Image Gallery")
     
     if not st.session_state.review_queue:
@@ -345,42 +360,45 @@ def thumbnail_sidebar():
     
     st.divider()
     
-    # Thumbnail grid
+    # Thumbnail column
     st.markdown("**Click image to select:**")
     
-    # Create thumbnail grid (3 columns for better fit)
-    cols = st.columns(3)
-    
+    # Display thumbnails in a single column
     for i, item in enumerate(st.session_state.review_queue):
-        col_idx = i % 3
+        # Determine status and styling
+        is_selected = i == st.session_state.selected_image_index
+        status = st.session_state.image_states[i] if i < len(st.session_state.image_states) else 'ready'
         
-        with cols[col_idx]:
-            # Determine status and styling
-            is_selected = i == st.session_state.selected_image_index
-            status = st.session_state.image_states[i] if i < len(st.session_state.image_states) else 'ready'
-            
-            # Create clickable thumbnail
-            if st.button(
-                f"#{i+1}",
-                key=f"thumb_{i}",
-                help=f"Click to select image {i+1}",
-                use_container_width=True
-            ):
-                st.session_state.selected_image_index = i
-                st.rerun()
-            
-            # Show thumbnail image
+        # Create container for each thumbnail
+        with st.container():
+            # Show selection indicator
             if is_selected:
                 st.markdown("🟢 **Selected**")
             
+            # Show thumbnail image or placeholder
             if item['image'] is not None:
-                st.image(item['image'], use_container_width=True)
+                # Use image with button overlay approach
+                col1, col2, col3 = st.columns([0.1, 0.8, 0.1])
+                with col2:
+                    # Display the image
+                    st.image(item['image'], use_container_width=True)
+                    
+                    # Invisible button that covers the image area
+                    if st.button(
+                        "📷",
+                        key=f"img_btn_{i}",
+                        help=f"Select this image",
+                        use_container_width=True
+                    ):
+                        st.session_state.selected_image_index = i
+                        st.rerun()
             else:
                 # Show placeholder for generating images
-                st.markdown("🔄 **Generating...**")
-                st.empty()  # Placeholder space
+                with st.container():
+                    st.markdown("🔄 **Generating...**")
+                    st.empty()  # Placeholder space
             
-            # Show status and prompt preview
+            # Show status indicator
             if status == 'generating':
                 st.markdown("🟡 Generating...")
             elif status == 'ready':
@@ -388,10 +406,14 @@ def thumbnail_sidebar():
             
             # Show truncated prompt
             if item['type'] == 'text_to_image':
-                prompt_preview = item['prompt'][:30] + "..." if len(item['prompt']) > 30 else item['prompt']
-                st.caption(f"Prompt: {prompt_preview}")
+                prompt_preview = item['prompt'][:40] + "..." if len(item['prompt']) > 40 else item['prompt']
+                st.caption(f"📝 {prompt_preview}")
             else:
-                st.caption(f"Modified: {item.get('original_filename', 'Image')}")
+                st.caption(f"🖼️ {item.get('original_filename', 'Image')}")
+            
+            # Add spacing between thumbnails
+            if i < len(st.session_state.review_queue) - 1:  # Don't add divider after last item
+                st.markdown("---")
 
 def generate_from_prompts(prompts: List[str]):
     """Generate images from text prompts in parallel"""
