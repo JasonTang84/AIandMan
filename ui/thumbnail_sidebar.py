@@ -7,12 +7,18 @@ from PIL import Image
 from st_clickable_images import clickable_images
 import base64
 import io
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 
 def render_thumbnail_sidebar():
     """Render the right sidebar with thumbnail gallery"""
-    # MOCK FUNCTION - Comment this line to disable mock data
-    load_mock_images()
+    # Check environment variable flag for loading mock data
+    load_mock_flag = os.getenv('LOAD_MOCK_IMAGES', 'false').lower() == 'true'
+    if load_mock_flag:
+        load_mock_images()
     
     with st.container():
         thumbnail_gallery()
@@ -189,10 +195,14 @@ def load_mock_images():
     """
     MOCK FUNCTION FOR DEBUGGING - Load sample images for testing thumbnail sidebar
     
+    This function is controlled by the LOAD_MOCK_IMAGES environment variable in .env
+    Set LOAD_MOCK_IMAGES=true in your .env file to enable mock data
+    Set LOAD_MOCK_IMAGES=false (or omit) to disable mock data
+    
     To use this function:
     1. Place your test images in a 'mock_images' folder in the project root
     2. Or modify the image_paths list below with your own image paths
-    3. Comment the function call in render_thumbnail_sidebar() to disable
+    3. Set LOAD_MOCK_IMAGES=true in your .env file to enable
     
     This function will automatically populate the thumbnail sidebar with test images
     """
