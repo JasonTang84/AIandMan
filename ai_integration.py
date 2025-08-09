@@ -5,15 +5,21 @@ import io
 import requests
 from typing import Optional
 import base64
+from dotenv import load_dotenv
 
 class AIImageGenerator:
     def __init__(self):
         print("🔧 AIImageGenerator: Starting initialization...")
         
+        # Reload environment variables to get latest values
+        load_dotenv(override=True)
+        
+        endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
+        
         self.client = AzureOpenAI(
             api_key=os.getenv('AZURE_OPENAI_API_KEY'),
             api_version="2025-04-01-preview",
-            azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT')
+            azure_endpoint=endpoint
         )
         self.default_size = "1024x1024"
         self.default_quality = "low"  # GPT-image-1 supports low, medium, high
@@ -44,33 +50,64 @@ class AIImageGenerator:
             return None
     
     def modify_image(self, image: Image.Image, prompt: str = None) -> Optional[Image.Image]:
-        """Modify an existing image using GPT-image-1 edit functionality"""
+        """Modify an existing image using GPT-image-1 edit API via direct HTTP request"""
         try:
             print("🔄 Modifying image...")
-            
-            # Convert PIL Image to bytes
-            img_byte_arr = io.BytesIO()
-            image.save(img_byte_arr, format='PNG')
-            img_byte_arr.seek(0)
-            
+            print(f"🔗 Using endpoint: {os.getenv('AZURE_OPENAI_ENDPOINT')}")
             # Use default enhancement prompt if none provided
             if not prompt:
                 prompt = "Enhance this image to make it more vibrant, clear, and visually appealing while maintaining its original composition and style."
             
-            # GPT-image-1 supports image editing
-            response = self.client.images.edit(
-                image=img_byte_arr,
-                prompt=prompt,
-                model="gpt-image-1",
-                size=self.default_size,
-                quality=self.default_quality,
-                n=1,
-            )
+            # Convert PIL Image to bytes for multipart upload
+            img_byte_arr = io.BytesIO()
+            image.save(img_byte_arr, format='PNG')
+            img_byte_arr.seek(0)
+            
+            # Construct the edit endpoint URL manually (following Microsoft Learn guidance)
+            azure_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
+            deployment_name = "gpt-image-1"  # Your deployment name
+            api_version = "2025-04-01-preview"
+            
+            edit_url = f"{azure_endpoint}/openai/deployments/{deployment_name}/images/edits?api-version={api_version}"
+            print(f"🔗 GPT-image-1 Edit API URL: {edit_url}")
+            
+            # Prepare headers
+            headers = {
+                'api-key': os.getenv('AZURE_OPENAI_API_KEY')
+            }
+            
+            # Prepare multipart form data exactly as shown in Microsoft Learn example
+            # Note: Using just "image" as field name, not "image[]"
+            files = {
+                'image': ('image.png', img_byte_arr.getvalue(), 'image/png')
+            }
+            
+            data = {
+                'model': deployment_name,
+                'prompt': prompt,
+                'size': self.default_size,
+                'quality': self.default_quality,
+                'n': '1'
+            }
+            
+            # Make the HTTP request using requests library
+            response = requests.post(edit_url, headers=headers, files=files, data=data)
+            
+            # Print detailed error info if request fails
+            if response.status_code != 200:
+                print(f"❌ HTTP Status: {response.status_code}")
+                print(f"❌ Response Headers: {dict(response.headers)}")
+                print(f"❌ Response Text: {response.text}")
+            
+            response.raise_for_status()
             
             print("✅ Image modified successfully")
             
-            # GPT-image-1 returns base64 encoded images
-            image_b64 = response.data[0].b64_json
+            # Parse response JSON
+            response_data = response.json()
+            
+            # GPT-image-1 returns base64 encoded images by default
+            image_b64 = response_data['data'][0]['b64_json']
             return self._decode_base64_image(image_b64)
             
         except Exception as e:
@@ -78,40 +115,7 @@ class AIImageGenerator:
             # Fallback: return original image if modification fails
             return image
     
-    def create_variation(self, image: Image.Image) -> Optional[Image.Image]:
-        """Create a variation of an existing image using GPT-image-1"""
-        try:
-            # Convert PIL Image to bytes
-            img_byte_arr = io.BytesIO()
-            # Ensure image is in RGBA format and under size limit
-            if image.mode != 'RGBA':
-                image = image.convert('RGBA')
-            
-            # Resize if too large (Azure OpenAI requires < 50MB)
-            if image.width > 1024 or image.height > 1024:
-                image.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
-            
-            image.save(img_byte_arr, format='PNG')
-            img_byte_arr.seek(0)
-            
-            # Use GPT-image-1's variation capabilities
-            response = self.client.images.edit(
-                image=img_byte_arr,
-                prompt="Create a variation of this image with similar style and composition",
-                model="gpt-image-1",
-                size=self.default_size,
-                quality=self.default_quality,
-                n=1
-            )
-            
-            # GPT-image-1 returns base64 encoded images
-            image_b64 = response.data[0].b64_json
-            return self._decode_base64_image(image_b64)
-            
-        except Exception as e:
-            print(f"Error creating image variation: {str(e)}")
-            return None
-    
+      
     def _download_image(self, url: str) -> Optional[Image.Image]:
         """Download an image from a URL and return as PIL Image"""
         try:

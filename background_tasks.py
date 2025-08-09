@@ -114,36 +114,55 @@ def process_images(uploaded_files, modification_prompt: str):
     
     # Add placeholder items with 'generating' status
     for uploaded_file in uploaded_files:
-        original_image = Image.open(uploaded_file)
-        st.session_state.review_queue.append({
-            'type': 'image_to_image',
-            'image': None,  # Will be filled when generation completes
-            'original_image': original_image,
-            'modification_prompt': modification_prompt,
-            'original_filename': uploaded_file.name,
-            'timestamp': time.time(),
-            'status': 'generating'
-        })
-        st.session_state.image_states.append('generating')
+        try:
+            original_image = Image.open(uploaded_file)
+            # Verify the image is valid by trying to load it
+            original_image.load()
+            # Convert to RGB if necessary for consistency
+            if original_image.mode not in ('RGB', 'RGBA'):
+                original_image = original_image.convert('RGB')
+                
+            st.session_state.review_queue.append({
+                'type': 'image_to_image',
+                'image': None,  # Will be filled when generation completes
+                'original_image': original_image,
+                'modification_prompt': modification_prompt,
+                'original_filename': uploaded_file.name,
+                'timestamp': time.time(),
+                'status': 'generating'
+            })
+            st.session_state.image_states.append('generating')
+        except Exception as e:
+            st.error(f"❌ Error loading image {uploaded_file.name}: {str(e)}")
+            continue
     
     add_log(f"🔄 Starting background processing for {len(uploaded_files)} images...")
     
     # Submit background tasks without waiting
     for i, uploaded_file in enumerate(uploaded_files):
-        queue_index = len(st.session_state.review_queue) - len(uploaded_files) + i
-        original_image = Image.open(uploaded_file)
-        
-        future = st.session_state.executor.submit(ai_generator.modify_image, original_image, modification_prompt)
-        
-        # Store future info for background checking
-        st.session_state.background_futures.append({
-            'future': future,
-            'prompt': f"Transform {uploaded_file.name}",
-            'queue_index': queue_index,
-            'type': 'image_to_image'
-        })
-        
-        add_log(f"🎯 Submitted background task for: {uploaded_file.name}")
+        try:
+            queue_index = len(st.session_state.review_queue) - len(uploaded_files) + i
+            original_image = Image.open(uploaded_file)
+            # Verify the image is valid
+            original_image.load()
+            # Convert to RGB if necessary
+            if original_image.mode not in ('RGB', 'RGBA'):
+                original_image = original_image.convert('RGB')
+            
+            future = st.session_state.executor.submit(ai_generator.modify_image, original_image, modification_prompt)
+            
+            # Store future info for background checking
+            st.session_state.background_futures.append({
+                'future': future,
+                'prompt': f"Transform {uploaded_file.name}",
+                'queue_index': queue_index,
+                'type': 'image_to_image'
+            })
+            
+            add_log(f"🎯 Submitted background task for: {uploaded_file.name}")
+        except Exception as e:
+            st.error(f"❌ Error processing image {uploaded_file.name}: {str(e)}")
+            continue
     
     st.success(f"🖼️ Started processing {len(uploaded_files)} images in background! Results will appear as they complete.")
     st.rerun()

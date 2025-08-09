@@ -19,20 +19,20 @@ def apply_custom_css():
     st.markdown("""
     <style>
     .css-1d391kg {
-        width: 400px;
+        width: 300px;
     }
     .css-1lcbmhc {
-        max-width: 400px;
+        max-width: 300px;
     }
     .st-emotion-cache-1legitb {
-        max-width: 400px;
-        min-width: 400px;
+        max-width: 300px;
+        min-width: 300px;
     }
     section[data-testid="stSidebar"] {
-        width: 400px !important;
+        width: 300px !important;
     }
     section[data-testid="stSidebar"] > div {
-        width: 400px !important;
+        width: 300px !important;
     }
     .main-content {
         padding: 0 20px;

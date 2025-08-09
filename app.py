@@ -14,7 +14,7 @@ from ui.main_content import render_main_content
 from ui.thumbnail_sidebar import render_thumbnail_sidebar
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 
 @st.fragment(run_every=3)  # Auto-run every 3 seconds
