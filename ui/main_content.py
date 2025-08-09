@@ -45,8 +45,6 @@ def render_image_viewer():
     # Header with navigation
     render_navigation_header(queue_length)
     
-    st.divider()
-    
     # Image display area
     render_image_display(current_item)
     
@@ -130,18 +128,16 @@ def render_action_controls(current_item):
             reject_image()
     
     with col3:
-        modify_prompt = st.text_input(
-            "🔄 Transform with new prompt:", 
-            key="modify_prompt",
-            placeholder="Enter transformation instructions..."
-        )
-        
-        col3a, col3b = st.columns([1, 1])
-        with col3a:
-            if st.button("🔄 Redo", use_container_width=True, disabled=not modify_prompt.strip(), help="Regenerate with new prompt"):
-                if modify_prompt.strip():
-                    modify_image(current_item, modify_prompt)
-        
-        with col3b:
-            if st.button("🗑️ Remove", use_container_width=True, help="Remove from queue without saving"):
-                remove_current_image()
+        if st.button("🗑️ Remove", use_container_width=True, help="Remove from queue without saving"):
+            remove_current_image()
+    
+    # Second row for transformation controls
+    modify_prompt = st.text_input(
+        "🔄 Transform with new prompt:", 
+        key="modify_prompt",
+        placeholder="Enter transformation instructions..."
+    )
+    
+    if st.button("🔄 Redo", use_container_width=True, disabled=not modify_prompt.strip(), help="Regenerate with new prompt"):
+        if modify_prompt.strip():
+            modify_image(current_item, modify_prompt)

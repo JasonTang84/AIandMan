@@ -32,7 +32,6 @@ def render_sidebar():
 
 def render_configuration():
     """Render the configuration section"""
-    st.header("Configuration")
     st.session_state.output_folder = st.text_input(
         "Output Folder", 
         value=st.session_state.output_folder,
