@@ -53,7 +53,6 @@ class AIImageGenerator:
         """Modify an existing image using GPT-image-1 edit API via direct HTTP request"""
         try:
             print("🔄 Modifying image...")
-            print(f"🔗 Using endpoint: {os.getenv('AZURE_OPENAI_ENDPOINT')}")
             # Use default enhancement prompt if none provided
             if not prompt:
                 prompt = "Enhance this image to make it more vibrant, clear, and visually appealing while maintaining its original composition and style."
@@ -68,9 +67,7 @@ class AIImageGenerator:
             deployment_name = "gpt-image-1"  # Your deployment name
             api_version = "2025-04-01-preview"
             
-            edit_url = f"{azure_endpoint}/openai/deployments/{deployment_name}/images/edits?api-version={api_version}"
-            print(f"🔗 GPT-image-1 Edit API URL: {edit_url}")
-            
+            edit_url = f"{azure_endpoint}/openai/deployments/{deployment_name}/images/edits?api-version={api_version}"           
             # Prepare headers
             headers = {
                 'api-key': os.getenv('AZURE_OPENAI_API_KEY')

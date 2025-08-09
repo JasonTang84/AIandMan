@@ -200,11 +200,17 @@ def modify_image(current_item, modify_prompt: str):
         new_item['modification_prompt'] = modify_prompt
         task_description = f"Transform image: {modify_prompt[:40]}..."
     
+    # Remove current image from queue first
+    current_index = st.session_state.selected_image_index
+    st.session_state.review_queue.pop(current_index)
+    if current_index < len(st.session_state.image_states):
+        st.session_state.image_states.pop(current_index)
+    
     # Add placeholder to queue
     st.session_state.review_queue.append(new_item)
     st.session_state.image_states.append('generating')
     
-    # Submit background task
+    # Submit background task - queue_index is now correct
     queue_index = len(st.session_state.review_queue) - 1
     
     # Get quality setting from session state
@@ -227,12 +233,6 @@ def modify_image(current_item, modify_prompt: str):
         'queue_index': queue_index,
         'type': current_item['type']
     })
-    
-    # Remove current image from queue
-    current_index = st.session_state.selected_image_index
-    st.session_state.review_queue.pop(current_index)
-    if current_index < len(st.session_state.image_states):
-        st.session_state.image_states.pop(current_index)
     
     # Select the newly added image (now at the end)
     st.session_state.selected_image_index = len(st.session_state.review_queue) - 1
