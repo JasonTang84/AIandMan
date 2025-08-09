@@ -4,12 +4,15 @@ Thumbnail sidebar UI component.
 import streamlit as st
 import os
 from PIL import Image
+from st_clickable_images import clickable_images
+import base64
+import io
 
 
 def render_thumbnail_sidebar():
     """Render the right sidebar with thumbnail gallery"""
     # MOCK FUNCTION - Comment this line to disable mock data
-    # load_mock_images()
+    load_mock_images()
     
     # Apply styling to the container
     st.markdown("""
@@ -126,6 +129,25 @@ def render_thumbnail_sidebar():
         row-gap: 0 !important;
         column-gap: 0 !important;
     }
+    
+    /* Style clickable images container */
+    div[data-testid="column"]:last-child .clickable-images {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 2px !important;
+    }
+    
+    /* Style individual clickable images */
+    div[data-testid="column"]:last-child .clickable-images img {
+        border: 2px solid transparent !important;
+        border-radius: 4px !important;
+        transition: border-color 0.2s ease !important;
+    }
+    
+    div[data-testid="column"]:last-child .clickable-images img:hover {
+        border-color: #1f77b4 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
     
@@ -133,91 +155,19 @@ def render_thumbnail_sidebar():
         thumbnail_gallery()
 
 
-def thumbnail_gallery():
-    """Render the thumbnail gallery with statistics and image grid"""
-    st.markdown("### 🖼️ Image Gallery")
-    
-    if not st.session_state.review_queue:
-        st.info("No images to display")
-        return
-    
-    # Statistics at top
-    render_gallery_stats()
-    
-    # Ultra-minimal divider
-    st.markdown("<hr style='margin:0; padding:0; height:1px; border:none; background:#ccc;'>", unsafe_allow_html=True)
-    
-    # Thumbnail column
-    st.markdown("**Click image to select:**")
-    
-    # Display thumbnails in a single column
-    for i, item in enumerate(st.session_state.review_queue):
-        render_thumbnail_item(i, item)
+@st.cache_data
+def pil_to_base64(image_bytes: bytes) -> str:
+    """Convert PIL Image bytes to base64 string for st-clickable-images"""
+    img_str = base64.b64encode(image_bytes).decode()
+    return f"data:image/png;base64,{img_str}"
 
 
-def render_gallery_stats():
-    """Render gallery statistics"""
-    total_images = len(st.session_state.review_queue)
-    generating_count = st.session_state.image_states.count('generating')
-    ready_count = st.session_state.image_states.count('ready')
-    failed_count = st.session_state.image_states.count('failed')
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total", total_images)
-    with col2:
-        st.metric("Ready", ready_count)
-    with col3:
-        st.metric("Generating", generating_count)
-
-
-def render_thumbnail_item(i, item):
-    """Render a single thumbnail item"""
-    # Determine status and styling
-    is_selected = i == st.session_state.selected_image_index
-    status = st.session_state.image_states[i] if i < len(st.session_state.image_states) else 'ready'
-    
-    # Create container for each thumbnail
-    with st.container():
-        # Show selection indicator
-        if is_selected:
-            st.markdown("🟢 **Selected**")
-        
-        # Show thumbnail image or placeholder
-        if item['image'] is not None:
-            render_ready_thumbnail(i, item)
-        else:
-            render_generating_thumbnail(i, item)
-        
-        # Show status indicator (more compact)
-        if status == 'generating':
-            st.markdown('<span class="processing-dots" style="color: #ff9800; font-size: 0.7rem;">🟡 </span>', unsafe_allow_html=True)
-        elif status == 'ready':
-            st.caption("🟢 Ready")
-        
-        # Show truncated prompt
-        render_thumbnail_caption(item)
-        
-        # Ultra-minimal spacing between thumbnails
-        if i < len(st.session_state.review_queue) - 1:  # Don't add divider after last item
-            st.markdown("<div style='margin:0; padding:0; height:1px; border-bottom:1px solid #e0e0e0;'></div>", unsafe_allow_html=True)
-
-
-def render_ready_thumbnail(i, item):
-    """Render thumbnail for a ready image"""
-    # Use full width for more compact display
-    # Display the image
-    st.image(item['image'], use_container_width=True)
-    
-    # Compact button that covers the image area
-    if st.button(
-        "Select",
-        key=f"img_btn_{i}",
-        help=f"Select this image",
-        use_container_width=True
-    ):
-        st.session_state.selected_image_index = i
-        st.rerun()
+def image_to_bytes(image: Image.Image) -> bytes:
+    """Convert PIL Image to bytes"""
+    img_buffer = io.BytesIO()
+    image.save(img_buffer, format='PNG')
+    img_buffer.seek(0)
+    return img_buffer.getvalue()
 
 
 def render_generating_thumbnail(i, item):
@@ -234,20 +184,25 @@ def render_generating_thumbnail(i, item):
             justify-content: center;
             border-radius: 6px;
             margin: 1px 0;
-        ">
+            cursor: pointer;
+        " onclick="this.style.backgroundColor='#e0e0e0';">
             <div style="text-align: center; color: #666;">
                 <div class="processing-spinner" style="font-size: 16px;">🔄</div>
-                <div class="processing-dots" style="font-size: 10px;"></div>
+                <div class="processing-dots" style="font-size: 10px;">Generating...</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Compact button for generating images
+        # Show truncated prompt as caption
+        render_thumbnail_caption(item)
+        
+        # Make it clickable by detecting click through session state
         if st.button(
-            "View",
+            "🔄 Generating...",
             key=f"gen_btn_{i}",
             help=f"View generation progress",
-            use_container_width=True
+            use_container_width=True,
+            disabled=True
         ):
             st.session_state.selected_image_index = i
             st.rerun()
@@ -264,6 +219,118 @@ def render_thumbnail_caption(item):
         filename = item.get('original_filename', 'Image')
         short_filename = filename[:15] + "..." if len(filename) > 15 else filename
         st.caption(f"{short_filename}")
+
+
+def thumbnail_gallery():
+    """Render the thumbnail gallery with statistics and clickable image grid"""
+    st.markdown("### 🖼️ Image Gallery")
+    
+    if not st.session_state.review_queue:
+        st.info("No images to display")
+        return
+    
+    # Statistics at top
+    render_gallery_stats()
+    
+    # Ultra-minimal divider
+    st.markdown("<hr style='margin:0; padding:0; height:1px; border:none; background:#ccc;'>", unsafe_allow_html=True)
+    
+    # Only process images if there are any
+    has_ready_images = any(item['image'] is not None for item in st.session_state.review_queue)
+    
+    if not has_ready_images:
+        st.info("No ready images to display")
+    else:
+        # Prepare images for clickable_images only if needed
+        ready_images = []
+        image_indices = []
+        captions = []
+        
+        for i, item in enumerate(st.session_state.review_queue):
+            if item['image'] is not None:
+                # Convert PIL Image to base64 string using cached function
+                image_bytes = image_to_bytes(item['image'])
+                image_b64 = pil_to_base64(image_bytes)
+                ready_images.append(image_b64)
+                image_indices.append(i)
+                # Create caption
+                if item['type'] == 'text_to_image':
+                    prompt_preview = item['prompt'][:20] + "..." if len(item['prompt']) > 20 else item['prompt']
+                    captions.append(f"{prompt_preview}")
+                else:
+                    filename = item.get('original_filename', 'Image')
+                    short_filename = filename[:15] + "..." if len(filename) > 15 else filename
+                    captions.append(f"{short_filename}")
+        
+        # Display clickable images for ready images
+        if ready_images:
+            st.markdown("**Click image to select:**")
+            
+            # Show which image is currently selected
+            current_selected = st.session_state.get('selected_image_index', -1)
+            if current_selected >= 0 and current_selected < len(st.session_state.review_queue):
+                selected_item = st.session_state.review_queue[current_selected]
+                if selected_item['image'] is not None:
+                    # Find if the selected image is in our ready images list
+                    for idx, orig_idx in enumerate(image_indices):
+                        if orig_idx == current_selected:
+                            st.markdown(f"🟢 **Selected: Image {idx + 1}**")
+                            break
+            
+            clicked = clickable_images(
+                ready_images,
+                titles=captions,
+                div_style={
+                    "display": "flex", 
+                    "justify-content": "center", 
+                    "flex-wrap": "wrap",
+                    "flex-direction": "column",
+                    "align-items": "center",
+                    "gap": "2px"
+                },
+                img_style={
+                    "margin": "1px", 
+                    "height": "100px", 
+                    "width": "auto",
+                    "max-width": "110px",
+                    "cursor": "pointer", 
+                    "border-radius": "4px",
+                    "border": "2px solid transparent",
+                    "transition": "border-color 0.2s ease"
+                },
+                key="thumbnail_gallery"
+            )
+            
+            # Handle click - only rerun if selection actually changed
+            if clicked >= 0 and clicked < len(image_indices):
+                selected_index = image_indices[clicked]
+                current_selected = st.session_state.get('selected_image_index', -1)
+                if selected_index != current_selected:
+                    st.session_state.selected_image_index = selected_index
+                    st.rerun()
+    
+    # Display generating images separately (non-clickable)
+    generating_items = [(i, item) for i, item in enumerate(st.session_state.review_queue) if item['image'] is None]
+    if generating_items:
+        st.markdown("**Generating:**")
+        for i, item in generating_items:
+            render_generating_thumbnail(i, item)
+
+
+def render_gallery_stats():
+    """Render gallery statistics"""
+    total_images = len(st.session_state.review_queue)
+    generating_count = st.session_state.image_states.count('generating')
+    ready_count = st.session_state.image_states.count('ready')
+    failed_count = st.session_state.image_states.count('failed')
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total", total_images)
+    with col2:
+        st.metric("Ready", ready_count)
+    with col3:
+        st.metric("Generating", generating_count)
 
 
 def load_mock_images():
