@@ -58,24 +58,13 @@ def render_generating_thumbnail(i, item):
         
         # Show truncated prompt as caption
         render_thumbnail_caption(item)
-        
-        # Make it clickable by detecting click through session state
-        if st.button(
-            "🔄 Generating...",
-            key=f"gen_btn_{i}",
-            help=f"View generation progress",
-            use_container_width=True,
-            disabled=True
-        ):
-            st.session_state.selected_image_index = i
-            st.rerun()
 
 
 def render_thumbnail_caption(item):
     """Render caption for thumbnail"""
     if item['type'] == 'text_to_image':
-        # Much shorter prompt preview for compact display
-        prompt_preview = item['prompt'][:20] + "..." if len(item['prompt']) > 20 else item['prompt']
+        # Longer prompt preview for better readability
+        prompt_preview = item['prompt'][:50] + "..." if len(item['prompt']) > 50 else item['prompt']
         st.caption(f"{prompt_preview}")
     else:
         # Just filename without icon for compact display
