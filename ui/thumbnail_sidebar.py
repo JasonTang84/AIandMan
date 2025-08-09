@@ -191,7 +191,7 @@ def render_thumbnail_item(i, item):
         
         # Show status indicator (more compact)
         if status == 'generating':
-            st.caption("🟡 Generating...")
+            st.markdown('<span class="processing-dots" style="color: #ff9800; font-size: 0.7rem;">🟡 </span>', unsafe_allow_html=True)
         elif status == 'ready':
             st.caption("🟢 Ready")
         
@@ -223,7 +223,7 @@ def render_ready_thumbnail(i, item):
 def render_generating_thumbnail(i, item):
     """Render thumbnail for a generating image"""
     with st.container():
-        # Create a placeholder box with reduced margin
+        # Create a placeholder box with animated processing text
         st.markdown("""
         <div style="
             background-color: #f0f0f0;
@@ -236,8 +236,8 @@ def render_generating_thumbnail(i, item):
             margin: 1px 0;
         ">
             <div style="text-align: center; color: #666;">
-                <div style="font-size: 16px;">🔄</div>
-                <div style="font-size: 10px;">Processing...</div>
+                <div class="processing-spinner" style="font-size: 16px;">🔄</div>
+                <div class="processing-dots" style="font-size: 10px;"></div>
             </div>
         </div>
         """, unsafe_allow_html=True)

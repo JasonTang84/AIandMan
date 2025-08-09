@@ -89,6 +89,29 @@ def apply_custom_css():
         padding: 8px;
         font-size: 12px;
     }
+    
+    /* Simple animated processing indicators */
+    .processing-dots::after {
+        content: "Processing";
+        animation: dots 1.5s infinite;
+    }
+    
+    @keyframes dots {
+        0% { content: "Processing"; }
+        25% { content: "Processing."; }
+        50% { content: "Processing.."; }
+        75% { content: "Processing..."; }
+        100% { content: "Processing"; }
+    }
+    
+    .processing-spinner {
+        animation: spin 2s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -99,7 +122,7 @@ def render_background_task_status():
         active_tasks = len(st.session_state.background_futures)
         col1, col2 = st.columns([3, 1])
         with col1:
-            st.info(f"🔄 Generating {active_tasks} images in background...")
+            st.markdown(f'<div style="color: #1f77b4;"><span class="processing-spinner">🔄</span> <span class="processing-dots">Generating {active_tasks} images in background</span></div>', unsafe_allow_html=True)
         with col2:
             if st.button("🔄 Refresh", help="Check for completed images"):
                 st.rerun()
