@@ -4,7 +4,7 @@ Main content area UI components.
 import streamlit as st
 from state_manager import get_current_item, update_selected_index
 from image_actions import accept_image, reject_image, remove_current_image
-from background_tasks import modify_image
+from background_tasks import modify_image, generate_new_image
 
 
 def render_main_content():
@@ -15,6 +15,11 @@ def render_main_content():
         render_empty_state()
     else:
         render_image_viewer()
+    
+    # Always show action controls
+    st.divider()
+    current_item = get_current_item()
+    render_action_controls(current_item)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -50,10 +55,8 @@ def render_image_viewer():
     # Image display area
     render_image_display(current_item)
     
-    st.divider()
-    
-    # Action buttons and controls
-    render_action_controls(current_item)
+    # Note: Action controls are now rendered at the bottom of render_main_content()
+    # to ensure they're always visible
 
 
 def render_generating_state(current_item):
@@ -119,27 +122,41 @@ def render_action_controls(current_item):
     """Render the action controls for accept/reject/modify"""
     st.markdown("### 🎮 Review Actions")
     
+    # Disable controls if no current item
+    disabled = current_item is None or current_item.get('image') is None
+    
     col1, col2, col3 = st.columns([1, 1, 2])
     
     with col1:
-        if st.button("✅ Accept", type="primary", use_container_width=True, help="Save image to output folder"):
-            accept_image(current_item)
+        if st.button("✅ Accept", type="primary", use_container_width=True, help="Save image to output folder", disabled=disabled):
+            if current_item:
+                accept_image(current_item)
     
     with col2:
-        if st.button("❌ Reject", use_container_width=True, help="Discard this image"):
+        if st.button("❌ Reject", use_container_width=True, help="Discard this image", disabled=disabled):
             reject_image()
     
     with col3:
-        if st.button("🗑️ Remove", use_container_width=True, help="Remove from queue without saving"):
+        if st.button("🗑️ Remove", use_container_width=True, help="Remove from queue without saving", disabled=disabled):
             remove_current_image()
     
     # Second row for transformation controls
     modify_prompt = st.text_input(
         "🔄 Transform with new prompt:", 
         key="modify_prompt",
-        placeholder="Enter transformation instructions..."
+        placeholder="Enter transformation instructions...",
+        disabled=False
     )
     
-    if st.button("🔄 Redo", use_container_width=True, help="Regenerate with new prompt"):
-        if modify_prompt.strip() and current_item:
-            modify_image(current_item, modify_prompt)
+    # Third row for Create and Redo buttons
+    col_create, col_redo = st.columns([1, 1])
+    
+    with col_create:
+        if st.button("🎨 Create", use_container_width=True, help="Generate new image from prompt", disabled=False):
+            if modify_prompt.strip():
+                generate_new_image(modify_prompt)
+    
+    with col_redo:
+        if st.button("🔄 Redo", use_container_width=True, help="Regenerate with new prompt", disabled=disabled or not modify_prompt.strip()):
+            if modify_prompt.strip() and current_item:
+                modify_image(current_item, modify_prompt)

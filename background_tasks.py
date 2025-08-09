@@ -174,6 +174,15 @@ def process_images(uploaded_files, modification_prompt: str):
     st.rerun()
 
 
+def generate_new_image(prompt: str):
+    """Generate a new image from text prompt (non-blocking) - reuses existing functionality"""
+    # Simply call the existing generate_from_prompts with a single prompt
+    generate_from_prompts([prompt])
+    
+    # Select the newly added image (now at the end)
+    st.session_state.selected_image_index = len(st.session_state.review_queue) - 1
+
+
 def modify_image(current_item, modify_prompt: str):
     """Request transformation of the current image (non-blocking)"""
     try:

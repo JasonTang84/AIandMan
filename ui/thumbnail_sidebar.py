@@ -12,7 +12,7 @@ import io
 def render_thumbnail_sidebar():
     """Render the right sidebar with thumbnail gallery"""
     # MOCK FUNCTION - Comment this line to disable mock data
-    # load_mock_images()
+    load_mock_images()
     
     with st.container():
         thumbnail_gallery()
