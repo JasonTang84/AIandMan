@@ -17,6 +17,13 @@ from ui.thumbnail_sidebar import render_thumbnail_sidebar
 load_dotenv()
 
 
+@st.fragment(run_every=3)  # Auto-run every 3 seconds
+def background_task_monitor():
+    """Monitor background tasks and trigger rerun when completed"""
+    if check_background_tasks():
+        st.rerun()
+
+
 def main():
     """Main application entry point"""
     # Initialize page configuration
@@ -25,9 +32,9 @@ def main():
     # Initialize session state
     init_session_state()
     
-    # Check for completed background tasks on each run
-    if check_background_tasks():
-        st.rerun()
+    # Start background task monitoring (only if tasks exist)
+    if st.session_state.background_futures:
+        background_task_monitor()
     
     # Apply custom CSS styling
     apply_custom_css()

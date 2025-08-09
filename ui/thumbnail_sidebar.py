@@ -9,7 +9,7 @@ from PIL import Image
 def render_thumbnail_sidebar():
     """Render the right sidebar with thumbnail gallery"""
     # MOCK FUNCTION - Comment this line to disable mock data
-    load_mock_images()
+    # load_mock_images()
     
     # Apply styling to the container
     st.markdown("""
