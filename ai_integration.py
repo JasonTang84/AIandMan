@@ -21,7 +21,7 @@ class AIImageGenerator:
             api_version="2025-04-01-preview",
             azure_endpoint=endpoint
         )
-        self.default_size = "1024x1024"
+        self.default_size = "1024x1536"
         self.default_quality = "low"  # GPT-image-1 supports low, medium, high
         
         print("✅ AIImageGenerator: Initialization complete")
