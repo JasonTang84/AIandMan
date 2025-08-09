@@ -60,3 +60,20 @@ If input is an image, showing before/after image; If input is a prompt, showing 
 - **AI Engine**: GPT-Image-1
 - **Processing**: Parallel task execution
 - **Storage**: Local file system with user-configurable output paths
+
+## Setup & Authentication
+
+### Password Protection
+AIandMan includes a simple password authentication system to protect access:
+
+- **Default Password**: `aiandman2025`
+- **Custom Password**: Set `APP_PASSWORD` in your `.env` file
+- **Development Mode**: Set `STREAMLIT_ENV=development` to show password hints
+
+### Configuration
+1. Copy `.env.example` to `.env`
+2. Configure your Azure OpenAI credentials
+3. (Optional) Set a custom password with `APP_PASSWORD`
+
+### First Launch
+When you start the application, you'll be prompted to enter the password before accessing the main interface. The logout button is available in the sidebar once authenticated.
