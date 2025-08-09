@@ -45,11 +45,14 @@ def render_statistics():
     st.header("Statistics")
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Generated", st.session_state.stats['generated'])
+        st.metric("Generated", st.session_state.stats['generated'], label_visibility="collapsed")
+        st.caption("Generated")
     with col2:
-        st.metric("Accepted", st.session_state.stats['accepted'])
+        st.metric("Accepted", st.session_state.stats['accepted'], label_visibility="collapsed")
+        st.caption("Accepted")
     with col3:
-        st.metric("Rejected", st.session_state.stats['rejected'])
+        st.metric("Rejected", st.session_state.stats['rejected'], label_visibility="collapsed")
+        st.caption("Rejected")
 
 
 def text_to_image_interface():
@@ -74,9 +77,7 @@ def text_to_image_interface():
 
 
 def image_modification_interface():
-    """Image-to-image upload and transformation interface"""
-    st.write("Upload images for AI-powered transformation")
-    
+    """Image-to-image upload and transformation interface"""   
     uploaded_files = st.file_uploader(
         "Choose image files",
         type=['png', 'jpg', 'jpeg'],
@@ -100,8 +101,8 @@ def render_logs_section():
         st.divider()
         st.header("📋 Generation Logs")
         
-        # Show last 10 logs
-        recent_logs = st.session_state.generation_logs[-10:]
+        # Show last 6 logs
+        recent_logs = st.session_state.generation_logs[-6:]
         for log in recent_logs:
             st.text(log)
         
