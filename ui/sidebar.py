@@ -54,14 +54,11 @@ def render_statistics():
     st.header("Statistics")
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Generated", st.session_state.stats['generated'], label_visibility="collapsed")
-        st.caption("Generated")
+        st.metric("Generated", st.session_state.stats['generated'])
     with col2:
-        st.metric("Accepted", st.session_state.stats['accepted'], label_visibility="collapsed")
-        st.caption("Accepted")
+        st.metric("Accepted", st.session_state.stats['accepted'])
     with col3:
-        st.metric("Rejected", st.session_state.stats['rejected'], label_visibility="collapsed")
-        st.caption("Rejected")
+        st.metric("Rejected", st.session_state.stats['rejected'])
 
 
 def text_to_image_interface():
@@ -72,17 +69,22 @@ def text_to_image_interface():
         "Choose a text file",
         type=['txt'],
         key="text_file",
-        help="Limit 200MB per file • TXT"
+        help="Maximum 150 prompts • TXT"
     )
     
     if uploaded_file is not None:
         content = uploaded_file.read().decode('utf-8')
         prompts = parse_text_prompts(content)
         
-        st.success(f"Found {len(prompts)} prompts")
-        
-        if st.button("Generate Images", type="primary", use_container_width=True):
-            generate_from_prompts(prompts)
+        if len(prompts) > 150:
+            st.error(f"Too many prompts! Found {len(prompts)} prompts, but maximum allowed is 150. Please reduce the number of prompts in your file.")
+        elif len(prompts) == 0:
+            st.warning("No prompts found in the file. Make sure prompts are separated by semicolons (;)")
+        else:
+            st.success(f"Found {len(prompts)} prompts")
+            
+            if st.button("Generate Images", type="primary", use_container_width=True):
+                generate_from_prompts(prompts)
 
 
 def image_modification_interface():
