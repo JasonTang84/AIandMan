@@ -18,13 +18,9 @@ def render_sidebar():
     # Statistics section
     render_statistics()
     
-    st.divider()
-    
     # Text-to-Image workflow
     st.header("📝 Text-to-Image")
     text_to_image_interface()
-    
-    st.divider()
     
     # Image to Image workflow
     st.header("🖼️ Image to Image")
