@@ -210,10 +210,15 @@ def modify_image(current_item, modify_prompt: str):
     # Get quality setting from session state
     quality = getattr(st.session_state, 'image_quality', 'low')
     
-    if current_item['type'] == 'text_to_image':
-        future = st.session_state.executor.submit(ai_generator.generate_from_text, new_item['prompt'], quality=quality)
+    # When modifying an existing image, always use modify_image regardless of original type
+    # Use the current image as the source for modification
+    source_image = current_item.get('image') or current_item.get('original_image')
+    if source_image:
+        future = st.session_state.executor.submit(ai_generator.modify_image, source_image, modify_prompt, quality=quality)
     else:
-        future = st.session_state.executor.submit(ai_generator.modify_image, current_item['original_image'], modify_prompt, quality=quality)
+        add_log(f"❌ Error: No source image available for modification")
+        st.error("❌ Error: No source image available for modification")
+        return
     
     # Store future info for background checking
     st.session_state.background_futures.append({
