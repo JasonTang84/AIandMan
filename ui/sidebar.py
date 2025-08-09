@@ -37,6 +37,16 @@ def render_configuration():
         value=st.session_state.output_folder,
         help="Folder where accepted images will be saved"
     )
+    
+    # Quality setting for both generation and modification
+    if 'image_quality' not in st.session_state:
+        st.session_state.image_quality = "low"
+    st.session_state.image_quality = st.selectbox(
+        "Image Quality",
+        options=["low", "medium", "high"],
+        index=["low", "medium", "high"].index(st.session_state.image_quality),
+        help="Quality setting for both generation and modification"
+    )
 
 
 def render_statistics():

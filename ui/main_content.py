@@ -45,6 +45,8 @@ def render_image_viewer():
     # Header with navigation
     render_navigation_header(queue_length)
     
+    st.divider()
+    
     # Image display area
     render_image_display(current_item)
     
@@ -138,6 +140,6 @@ def render_action_controls(current_item):
         placeholder="Enter transformation instructions..."
     )
     
-    if st.button("🔄 Redo", use_container_width=True, disabled=not modify_prompt.strip(), help="Regenerate with new prompt"):
-        if modify_prompt.strip():
+    if st.button("🔄 Redo", use_container_width=True, help="Regenerate with new prompt"):
+        if modify_prompt.strip() and current_item:
             modify_image(current_item, modify_prompt)

@@ -49,7 +49,7 @@ class AIImageGenerator:
             print(f"❌ Error generating image: {str(e)}")
             return None
     
-    def modify_image(self, image: Image.Image, prompt: str = None) -> Optional[Image.Image]:
+    def modify_image(self, image: Image.Image, prompt: str = None, quality: str = None) -> Optional[Image.Image]:
         """Modify an existing image using GPT-image-1 edit API via direct HTTP request"""
         try:
             print("🔄 Modifying image...")
@@ -86,7 +86,7 @@ class AIImageGenerator:
                 'model': deployment_name,
                 'prompt': prompt,
                 'size': self.default_size,
-                'quality': self.default_quality,
+                'quality': quality or self.default_quality,
                 'n': '1'
             }
             

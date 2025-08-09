@@ -84,10 +84,13 @@ def generate_from_prompts(prompts: List[str]):
     # Submit background tasks without waiting
     add_log(f"🔄 Starting background generation for {len(prompts)} tasks...")
     
+    # Get quality setting from session state
+    quality = getattr(st.session_state, 'image_quality', 'low')
+    
     for i, prompt in enumerate(prompts):
         queue_index = len(st.session_state.review_queue) - len(prompts) + i
         add_log(f"🎯 Submitting background task {i+1}: {prompt[:30]}...")
-        future = st.session_state.executor.submit(ai_generator.generate_from_text, prompt)
+        future = st.session_state.executor.submit(ai_generator.generate_from_text, prompt, quality=quality)
         
         # Store future info for background checking
         st.session_state.background_futures.append({
@@ -139,6 +142,9 @@ def process_images(uploaded_files, modification_prompt: str):
     add_log(f"🔄 Starting background processing for {len(uploaded_files)} images...")
     
     # Submit background tasks without waiting
+    # Get quality setting from session state
+    quality = getattr(st.session_state, 'image_quality', 'low')
+    
     for i, uploaded_file in enumerate(uploaded_files):
         try:
             queue_index = len(st.session_state.review_queue) - len(uploaded_files) + i
@@ -149,7 +155,7 @@ def process_images(uploaded_files, modification_prompt: str):
             if original_image.mode not in ('RGB', 'RGBA'):
                 original_image = original_image.convert('RGB')
             
-            future = st.session_state.executor.submit(ai_generator.modify_image, original_image, modification_prompt)
+            future = st.session_state.executor.submit(ai_generator.modify_image, original_image, modification_prompt, quality=quality)
             
             # Store future info for background checking
             st.session_state.background_futures.append({
@@ -201,10 +207,13 @@ def modify_image(current_item, modify_prompt: str):
     # Submit background task
     queue_index = len(st.session_state.review_queue) - 1
     
+    # Get quality setting from session state
+    quality = getattr(st.session_state, 'image_quality', 'low')
+    
     if current_item['type'] == 'text_to_image':
-        future = st.session_state.executor.submit(ai_generator.generate_from_text, new_item['prompt'])
+        future = st.session_state.executor.submit(ai_generator.generate_from_text, new_item['prompt'], quality=quality)
     else:
-        future = st.session_state.executor.submit(ai_generator.modify_image, current_item['original_image'], modify_prompt)
+        future = st.session_state.executor.submit(ai_generator.modify_image, current_item['original_image'], modify_prompt, quality=quality)
     
     # Store future info for background checking
     st.session_state.background_futures.append({
