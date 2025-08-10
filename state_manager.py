@@ -36,7 +36,7 @@ def init_session_state():
         st.session_state.pending_logs = []
 
     if 'executor' not in st.session_state:
-        st.session_state.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        st.session_state.executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
 
 def find_item_by_id(item_id: str):
