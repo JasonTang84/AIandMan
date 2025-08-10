@@ -12,8 +12,8 @@ def render_sidebar():
     st.title("🎨 AIandMan")
     st.subheader("AI & Human Collaboration Tool")
     
-    # Configuration section
-    render_configuration()
+    # Image quality configuration
+    render_image_quality_setting()
     
     # Statistics section
     render_statistics()
@@ -30,14 +30,8 @@ def render_sidebar():
     render_logs_section()
 
 
-def render_configuration():
-    """Render the configuration section"""
-    st.session_state.output_folder = st.text_input(
-        "Output Folder", 
-        value=st.session_state.output_folder,
-        help="Folder where accepted images will be saved"
-    )
-    
+def render_image_quality_setting():
+    """Render the image quality setting"""
     # Quality setting for both generation and modification
     if 'image_quality' not in st.session_state:
         st.session_state.image_quality = "low"

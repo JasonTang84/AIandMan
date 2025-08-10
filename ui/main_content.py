@@ -3,7 +3,7 @@ Main content area UI components.
 """
 import streamlit as st
 from state_manager import get_current_item, update_selected_index
-from image_actions import accept_image, reject_image, remove_current_image
+from image_actions import reject_image, remove_current_image, create_download_button
 from background_tasks import modify_image, generate_new_image
 
 
@@ -128,9 +128,8 @@ def render_action_controls(current_item):
     col1, col2, col3 = st.columns([1, 1, 2])
     
     with col1:
-        if st.button("✅ Accept", type="primary", use_container_width=True, help="Save image to output folder", disabled=disabled):
-            if current_item:
-                accept_image(current_item)
+        # Use the download button function from image_actions
+        create_download_button(current_item, disabled)
     
     with col2:
         if st.button("❌ Reject", use_container_width=True, help="Discard this image", disabled=disabled):

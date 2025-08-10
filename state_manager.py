@@ -22,9 +22,6 @@ def init_session_state():
     if 'background_futures' not in st.session_state:
         st.session_state.background_futures = []
 
-    if 'output_folder' not in st.session_state:
-        st.session_state.output_folder = os.getenv('OUTPUT_FOLDER', './output')
-
     if 'selected_image_index' not in st.session_state:
         st.session_state.selected_image_index = 0
 

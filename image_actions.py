@@ -3,37 +3,72 @@ Image actions for accept, reject, and other operations.
 """
 import streamlit as st
 import os
+import io
 from state_manager import remove_from_queue, update_selected_index
-from utils import ensure_output_folder
 
 
-def accept_image(current_item):
-    """Accept and save the current image"""
+def get_image_download_data(current_item):
+    """Convert image to bytes for download"""
     try:
-        ensure_output_folder(st.session_state.output_folder)
-        
-        # Generate filename
-        timestamp = int(current_item['timestamp'])
-        if current_item['type'] == 'text_to_image':
-            filename = f"generated_{timestamp}.png"
-        else:
-            base_name = os.path.splitext(current_item['original_filename'])[0]
-            filename = f"transformed_{base_name}_{timestamp}.png"
-        
-        # Save image
-        filepath = os.path.join(st.session_state.output_folder, filename)
-        current_item['image'].save(filepath)
-        
-        # Update stats and remove from queue
-        st.session_state.stats['accepted'] += 1
-        current_index = st.session_state.selected_image_index
-        remove_from_queue(current_index)
-        
-        st.success(f"Image saved to {filepath}")
-        st.rerun()
-        
+        # Convert PIL Image to bytes
+        img_buffer = io.BytesIO()
+        current_item['image'].save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        return img_buffer.getvalue()
     except Exception as e:
-        st.error(f"Error saving image: {str(e)}")
+        st.error(f"Error preparing image for download: {str(e)}")
+        return None
+
+
+def get_download_filename(current_item):
+    """Generate appropriate filename for download"""
+    timestamp = int(current_item['timestamp'])
+    if current_item['type'] == 'text_to_image':
+        return f"generated_{timestamp}.png"
+    else:
+        base_name = os.path.splitext(current_item.get('original_filename', 'unknown'))[0]
+        return f"transformed_{base_name}_{timestamp}.png"
+
+
+def create_download_button(current_item, disabled=False):
+    """Create a download button for the current image and handle the download logic"""
+    if not current_item or current_item.get('image') is None:
+        return st.button("✅ Accept", type="primary", use_container_width=True, disabled=True, help="No image available")
+    
+    image_data = get_image_download_data(current_item)
+    filename = get_download_filename(current_item)
+    
+    if not image_data:
+        return st.button("✅ Accept", type="primary", use_container_width=True, disabled=True, help="Error preparing image")
+    
+    # Create a unique key for this download based on timestamp and index
+    download_key = f"download_{current_item.get('timestamp', 0)}_{st.session_state.selected_image_index}"
+    
+    downloaded = st.download_button(
+        label="✅ Accept & Download",
+        data=image_data,
+        file_name=filename,
+        mime="image/png",
+        type="primary",
+        use_container_width=True,
+        help="Download image to your computer",
+        disabled=disabled,
+        key=download_key
+    )
+    
+    # Track if this image was downloaded and remove from queue
+    if downloaded:
+        download_session_key = f"downloaded_{download_key}"
+        if download_session_key not in st.session_state:
+            st.session_state[download_session_key] = True
+            # Update stats and remove from queue
+            st.session_state.stats['accepted'] += 1
+            current_index = st.session_state.selected_image_index
+            remove_from_queue(current_index)
+            st.success(f"✅ Image downloaded: {filename}")
+            st.rerun()
+    
+    return downloaded
 
 
 def reject_image():
