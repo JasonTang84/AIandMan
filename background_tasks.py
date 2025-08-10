@@ -44,27 +44,35 @@ def check_background_tasks():
     
     for future_info in st.session_state.background_futures:
         future = future_info['future']
-        start_time = future_info.get('start_time', time.time())
         current_time = time.time()
-        elapsed_time = current_time - start_time
         
-        # Check if task has timed out
-        if elapsed_time > TASK_TIMEOUT:
-            queue_index = future_info['queue_index']
-            prompt = future_info['prompt']
+        # Check if the task is actually running (not just queued)
+        if future.running():
+            # Task is actively running - start timing if not already started
+            if 'processing_start_time' not in future_info:
+                future_info['processing_start_time'] = current_time
+                add_log(f"🏃 Started processing: {future_info['prompt'][:40]}...")
             
-            # Cancel the future task
-            future.cancel()
-            add_log(f"⏰ Timeout ({TASK_TIMEOUT}s): {prompt[:40]}...")
+            processing_start_time = future_info['processing_start_time']
+            elapsed_time = current_time - processing_start_time
             
-            # Mark as failed due to timeout
-            if queue_index < len(st.session_state.image_states):
-                st.session_state.image_states[queue_index] = 'failed'
-            if queue_index < len(st.session_state.review_queue):
-                st.session_state.review_queue[queue_index]['status'] = 'timeout'
-            
-            completed_any = True
-            continue
+            # Check if task has timed out (only while actually processing)
+            if elapsed_time > TASK_TIMEOUT:
+                queue_index = future_info['queue_index']
+                prompt = future_info['prompt']
+                
+                # Cancel the future task
+                future.cancel()
+                add_log(f"⏰ Timeout ({TASK_TIMEOUT}s): {prompt[:40]}...")
+                
+                # Mark as failed due to timeout
+                if queue_index < len(st.session_state.image_states):
+                    st.session_state.image_states[queue_index] = 'failed'
+                if queue_index < len(st.session_state.review_queue):
+                    st.session_state.review_queue[queue_index]['status'] = 'timeout'
+                
+                completed_any = True
+                continue
         
         if future.done():
             try:
@@ -152,13 +160,12 @@ def generate_from_prompts(prompts: List[str]):
         add_log(f"🎯 Submitting background task {i+1}: {prompt[:30]}...")
         future = st.session_state.executor.submit(ai_generator.generate_from_text, prompt, quality=quality, logger_callback=thread_safe_log)
         
-        # Store future info for background checking with start time
+        # Store future info for background checking (timeout timer starts only when processing begins)
         st.session_state.background_futures.append({
             'future': future,
             'prompt': prompt,
             'queue_index': queue_index,
-            'type': 'text_to_image',
-            'start_time': time.time()
+            'type': 'text_to_image'
         })
     
     add_log(f"✅ All {len(prompts)} tasks submitted to background executor")
@@ -218,13 +225,12 @@ def process_images(uploaded_files, modification_prompt: str):
             
             future = st.session_state.executor.submit(ai_generator.modify_image, original_image, modification_prompt, quality=quality, logger_callback=thread_safe_log)
             
-            # Store future info for background checking with start time
+            # Store future info for background checking (timeout timer starts only when processing begins)
             st.session_state.background_futures.append({
                 'future': future,
                 'prompt': f"Transform {uploaded_file.name}",
                 'queue_index': queue_index,
-                'type': 'image_to_image',
-                'start_time': time.time()
+                'type': 'image_to_image'
             })
             
             add_log(f"🎯 Submitted background task for: {uploaded_file.name}")
@@ -297,13 +303,12 @@ def modify_image(current_item, modify_prompt: str):
         st.error("❌ Error: No source image available for modification")
         return
     
-    # Store future info for background checking with start time
+    # Store future info for background checking (timeout timer starts only when processing begins)
     st.session_state.background_futures.append({
         'future': future,
         'prompt': task_description,
         'queue_index': queue_index,
-        'type': current_item['type'],
-        'start_time': time.time()
+        'type': current_item['type']
     })
     
     # Select the newly added image (now at the end)
@@ -323,12 +328,22 @@ def get_running_tasks_status():
     status_lines = []
     
     for i, future_info in enumerate(st.session_state.background_futures):
-        start_time = future_info.get('start_time', current_time)
-        elapsed_time = current_time - start_time
-        remaining_time = max(0, TASK_TIMEOUT - elapsed_time)
-        
+        future = future_info['future']
         prompt = future_info['prompt'][:30]
-        status_lines.append(f"Task {i+1}: {prompt}... ({elapsed_time:.1f}s elapsed, {remaining_time:.1f}s remaining)")
+        
+        if future.running():
+            # Task is actually processing
+            if 'processing_start_time' in future_info:
+                processing_start_time = future_info['processing_start_time']
+                elapsed_time = current_time - processing_start_time
+                remaining_time = max(0, TASK_TIMEOUT - elapsed_time)
+                status_lines.append(f"Task {i+1}: {prompt}... (RUNNING: {elapsed_time:.1f}s elapsed, {remaining_time:.1f}s remaining)")
+            else:
+                status_lines.append(f"Task {i+1}: {prompt}... (RUNNING: just started)")
+        elif future.done():
+            status_lines.append(f"Task {i+1}: {prompt}... (COMPLETED)")
+        else:
+            status_lines.append(f"Task {i+1}: {prompt}... (QUEUED: waiting to start)")
     
     return "\n".join(status_lines)
 

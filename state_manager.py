@@ -35,7 +35,7 @@ def init_session_state():
         st.session_state.pending_logs = []
 
     if 'executor' not in st.session_state:
-        st.session_state.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+        st.session_state.executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
 
 def add_log(message: str):
