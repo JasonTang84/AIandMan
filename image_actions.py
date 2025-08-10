@@ -4,6 +4,7 @@ Image actions for accept, reject, and other operations.
 import streamlit as st
 import os
 import io
+import time
 from state_manager import remove_from_queue, update_selected_index
 
 
@@ -22,7 +23,11 @@ def get_image_download_data(current_item):
 
 def get_download_filename(current_item):
     """Generate appropriate filename for download"""
-    timestamp = int(current_item['timestamp'])
+    try:
+        timestamp = int(current_item.get('timestamp', 0))
+    except (ValueError, TypeError):
+        timestamp = int(time.time())
+    
     if current_item['type'] == 'text_to_image':
         return f"generated_{timestamp}.png"
     else:
@@ -42,7 +47,12 @@ def create_download_button(current_item, disabled=False):
         return st.button("✅ Accept", type="primary", use_container_width=True, disabled=True, help="Error preparing image")
     
     # Create a unique key for this download based on timestamp and index
-    download_key = f"download_{current_item.get('timestamp', 0)}_{st.session_state.selected_image_index}"
+    try:
+        timestamp = int(current_item.get('timestamp', 0))
+    except (ValueError, TypeError):
+        timestamp = int(time.time())
+    
+    download_key = f"download_{timestamp}_{st.session_state.selected_image_index}"
     
     downloaded = st.download_button(
         label="✅ Accept & Download",

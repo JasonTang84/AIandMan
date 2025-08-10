@@ -6,13 +6,36 @@ import streamlit as st
 import time
 from typing import List
 from PIL import Image
+from concurrent.futures import TimeoutError
+import threading
 
 from ai_integration import AIImageGenerator
 from state_manager import add_log
 
+# Timeout settings
+TASK_TIMEOUT = 90  # 1 minute and 30 seconds
+
+# Thread-safe logging
+_log_lock = threading.Lock()
+
+def thread_safe_log(message: str):
+    """Thread-safe logging function that can be called from executor threads"""
+    with _log_lock:
+        # Use a simple list append which is thread-safe for the log messages
+        # The actual add_log call will happen in the main thread during check_background_tasks
+        if not hasattr(st.session_state, 'pending_logs'):
+            st.session_state.pending_logs = []
+        st.session_state.pending_logs.append(message)
+
 
 def check_background_tasks():
     """Check and update completed background generation tasks"""
+    # Process any pending logs first
+    if hasattr(st.session_state, 'pending_logs') and st.session_state.pending_logs:
+        for log_message in st.session_state.pending_logs:
+            add_log(log_message)
+        st.session_state.pending_logs = []
+    
     if not st.session_state.background_futures:
         return False
     
@@ -21,9 +44,32 @@ def check_background_tasks():
     
     for future_info in st.session_state.background_futures:
         future = future_info['future']
+        start_time = future_info.get('start_time', time.time())
+        current_time = time.time()
+        elapsed_time = current_time - start_time
+        
+        # Check if task has timed out
+        if elapsed_time > TASK_TIMEOUT:
+            queue_index = future_info['queue_index']
+            prompt = future_info['prompt']
+            
+            # Cancel the future task
+            future.cancel()
+            add_log(f"⏰ Timeout ({TASK_TIMEOUT}s): {prompt[:40]}...")
+            
+            # Mark as failed due to timeout
+            if queue_index < len(st.session_state.image_states):
+                st.session_state.image_states[queue_index] = 'failed'
+            if queue_index < len(st.session_state.review_queue):
+                st.session_state.review_queue[queue_index]['status'] = 'timeout'
+            
+            completed_any = True
+            continue
+        
         if future.done():
             try:
-                image = future.result()
+                # Try to get result with a short timeout to avoid blocking
+                image = future.result(timeout=0.1)
                 queue_index = future_info['queue_index']
                 prompt = future_info['prompt']
                 
@@ -36,13 +82,27 @@ def check_background_tasks():
                     st.session_state.stats['generated'] += 1
                     add_log(f"✅ Completed: {prompt[:40]}...")
                     completed_any = True
-            except Exception as e:
+            except TimeoutError:
+                # Task completed but result retrieval timed out
                 queue_index = future_info['queue_index']
                 prompt = future_info['prompt']
-                add_log(f"❌ Failed: {prompt[:40]}... - {str(e)}")
+                add_log(f"⏰ Result timeout: {prompt[:40]}...")
                 # Mark as failed
                 if queue_index < len(st.session_state.image_states):
                     st.session_state.image_states[queue_index] = 'failed'
+                if queue_index < len(st.session_state.review_queue):
+                    st.session_state.review_queue[queue_index]['status'] = 'timeout'
+                completed_any = True
+            except Exception as e:
+                queue_index = future_info['queue_index']
+                prompt = future_info['prompt']
+                add_log(f"❌ Task cancelled due to error: {prompt[:40]}... - {str(e)}")
+                # Mark as failed
+                if queue_index < len(st.session_state.image_states):
+                    st.session_state.image_states[queue_index] = 'failed'
+                if queue_index < len(st.session_state.review_queue):
+                    st.session_state.review_queue[queue_index]['status'] = 'failed'
+                completed_any = True
         else:
             remaining_futures.append(future_info)
     
@@ -90,14 +150,15 @@ def generate_from_prompts(prompts: List[str]):
     for i, prompt in enumerate(prompts):
         queue_index = len(st.session_state.review_queue) - len(prompts) + i
         add_log(f"🎯 Submitting background task {i+1}: {prompt[:30]}...")
-        future = st.session_state.executor.submit(ai_generator.generate_from_text, prompt, quality=quality)
+        future = st.session_state.executor.submit(ai_generator.generate_from_text, prompt, quality=quality, logger_callback=thread_safe_log)
         
-        # Store future info for background checking
+        # Store future info for background checking with start time
         st.session_state.background_futures.append({
             'future': future,
             'prompt': prompt,
             'queue_index': queue_index,
-            'type': 'text_to_image'
+            'type': 'text_to_image',
+            'start_time': time.time()
         })
     
     add_log(f"✅ All {len(prompts)} tasks submitted to background executor")
@@ -155,14 +216,15 @@ def process_images(uploaded_files, modification_prompt: str):
             if original_image.mode not in ('RGB', 'RGBA'):
                 original_image = original_image.convert('RGB')
             
-            future = st.session_state.executor.submit(ai_generator.modify_image, original_image, modification_prompt, quality=quality)
+            future = st.session_state.executor.submit(ai_generator.modify_image, original_image, modification_prompt, quality=quality, logger_callback=thread_safe_log)
             
-            # Store future info for background checking
+            # Store future info for background checking with start time
             st.session_state.background_futures.append({
                 'future': future,
                 'prompt': f"Transform {uploaded_file.name}",
                 'queue_index': queue_index,
-                'type': 'image_to_image'
+                'type': 'image_to_image',
+                'start_time': time.time()
             })
             
             add_log(f"🎯 Submitted background task for: {uploaded_file.name}")
@@ -229,18 +291,19 @@ def modify_image(current_item, modify_prompt: str):
     # Use the current image as the source for modification
     source_image = current_item.get('image') or current_item.get('original_image')
     if source_image:
-        future = st.session_state.executor.submit(ai_generator.modify_image, source_image, modify_prompt, quality=quality)
+        future = st.session_state.executor.submit(ai_generator.modify_image, source_image, modify_prompt, quality=quality, logger_callback=thread_safe_log)
     else:
         add_log(f"❌ Error: No source image available for modification")
         st.error("❌ Error: No source image available for modification")
         return
     
-    # Store future info for background checking
+    # Store future info for background checking with start time
     st.session_state.background_futures.append({
         'future': future,
         'prompt': task_description,
         'queue_index': queue_index,
-        'type': current_item['type']
+        'type': current_item['type'],
+        'start_time': time.time()
     })
     
     # Select the newly added image (now at the end)
@@ -249,3 +312,43 @@ def modify_image(current_item, modify_prompt: str):
     add_log(f"🔄 Started transformation: {task_description}")
     st.success("🔄 Transformation started! The new image will appear when ready.")
     st.rerun()
+
+
+def get_running_tasks_status():
+    """Get status information about currently running background tasks"""
+    if not st.session_state.background_futures:
+        return "No active background tasks"
+    
+    current_time = time.time()
+    status_lines = []
+    
+    for i, future_info in enumerate(st.session_state.background_futures):
+        start_time = future_info.get('start_time', current_time)
+        elapsed_time = current_time - start_time
+        remaining_time = max(0, TASK_TIMEOUT - elapsed_time)
+        
+        prompt = future_info['prompt'][:30]
+        status_lines.append(f"Task {i+1}: {prompt}... ({elapsed_time:.1f}s elapsed, {remaining_time:.1f}s remaining)")
+    
+    return "\n".join(status_lines)
+
+
+def cancel_all_background_tasks():
+    """Cancel all running background tasks"""
+    if not st.session_state.background_futures:
+        return False
+    
+    cancelled_count = 0
+    for future_info in st.session_state.background_futures:
+        future = future_info['future']
+        if future.cancel():
+            cancelled_count += 1
+            queue_index = future_info['queue_index']
+            if queue_index < len(st.session_state.image_states):
+                st.session_state.image_states[queue_index] = 'cancelled'
+            if queue_index < len(st.session_state.review_queue):
+                st.session_state.review_queue[queue_index]['status'] = 'cancelled'
+    
+    st.session_state.background_futures = []
+    add_log(f"🛑 Cancelled {cancelled_count} background tasks")
+    return cancelled_count > 0

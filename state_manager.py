@@ -31,6 +31,9 @@ def init_session_state():
     if 'generation_logs' not in st.session_state:
         st.session_state.generation_logs = []
 
+    if 'pending_logs' not in st.session_state:
+        st.session_state.pending_logs = []
+
     if 'executor' not in st.session_state:
         st.session_state.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 

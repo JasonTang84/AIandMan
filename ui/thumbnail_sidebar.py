@@ -3,14 +3,65 @@ Thumbnail sidebar UI component.
 """
 import streamlit as st
 import os
+import time
 from PIL import Image
 from st_clickable_images import clickable_images
 import base64
 import io
 from dotenv import load_dotenv
+from state_manager import remove_from_queue, add_log
 
 # Load environment variables
 load_dotenv()
+
+
+def cancel_generating_image(index):
+    """Cancel a generating image and remove it from the queue"""
+    try:
+        # Try to cancel the background task if it exists
+        cancelled_task = False
+        if st.session_state.background_futures:
+            for i, future_info in enumerate(st.session_state.background_futures):
+                if future_info['queue_index'] == index:
+                    future = future_info['future']
+                    if not future.done():
+                        cancelled = future.cancel()
+                        if cancelled:
+                            cancelled_task = True
+                            add_log(f"🛑 Cancelled background task for image {index + 1}")
+                        else:
+                            add_log(f"⚠️ Could not cancel background task for image {index + 1} (already running)")
+                    
+                    # Remove from background futures list
+                    st.session_state.background_futures.pop(i)
+                    break
+        
+        # Remove the image from the queue
+        remove_from_queue(index)
+        
+        if cancelled_task:
+            st.success(f"✅ Cancelled generation and removed image {index + 1}")
+        else:
+            st.success(f"✅ Removed image {index + 1} from queue")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Error cancelling image: {str(e)}")
+
+
+def remove_failed_image(index):
+    """Remove a failed/timeout/cancelled image from the queue"""
+    try:
+        item = st.session_state.review_queue[index]
+        status = item.get('status', 'unknown')
+        
+        # Remove the image from the queue
+        remove_from_queue(index)
+        
+        add_log(f"🗑️ Removed {status} image {index + 1}")
+        st.success(f"✅ Removed {status} image from queue")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Error removing image: {str(e)}")
 
 
 def render_thumbnail_sidebar():
@@ -41,29 +92,79 @@ def image_to_bytes(image: Image.Image) -> bytes:
 
 def render_generating_thumbnail(i, item):
     """Render thumbnail for a generating image"""
+    status = item.get('status', 'generating')
+    
     with st.container():
-        # Create a placeholder box with animated processing text
-        st.markdown("""
-        <div style="
-            background-color: #f0f0f0;
-            border: 1px dashed #ccc;
-            height: 100px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
-            margin: 1px 0;
-            cursor: pointer;
-        " onclick="this.style.backgroundColor='#e0e0e0';">
-            <div style="text-align: center; color: #666;">
-                <div class="processing-spinner" style="font-size: 16px;">🔄</div>
-                <div class="processing-dots" style="font-size: 10px;">Generating...</div>
+        if status == 'generating':
+            # Create a placeholder box with animated processing text
+            st.markdown("""
+            <div style="
+                background-color: #f0f0f0;
+                border: 1px dashed #ccc;
+                height: 100px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 6px;
+                margin: 1px 0;
+                cursor: pointer;
+            " onclick="this.style.backgroundColor='#e0e0e0';">
+                <div style="text-align: center; color: #666;">
+                    <div class="processing-spinner" style="font-size: 16px;">🔄</div>
+                    <div class="processing-dots" style="font-size: 10px;">Generating...</div>
+                </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+        elif status in ['failed', 'timeout', 'cancelled']:
+            # Create an error placeholder box
+            error_icon = "⏰" if status == 'timeout' else "❌" if status == 'failed' else "🛑"
+            error_text = "Timed Out" if status == 'timeout' else "Failed" if status == 'failed' else "Cancelled"
+            
+            st.markdown(f"""
+            <div style="
+                background-color: #ffe6e6;
+                border: 1px solid #ff9999;
+                height: 100px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 6px;
+                margin: 1px 0;
+            ">
+                <div style="text-align: center; color: #cc0000;">
+                    <div style="font-size: 16px;">{error_icon}</div>
+                    <div style="font-size: 10px;">{error_text}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         
         # Show truncated prompt as caption
         render_thumbnail_caption(item)
+        
+        # Add cancel/remove button based on status
+        try:
+            timestamp = int(item.get('timestamp', 0))
+        except (ValueError, TypeError):
+            timestamp = int(time.time())
+        
+        if status == 'generating':
+            # Cancel button for generating images
+            if st.button(
+                "❌", 
+                key=f"cancel_generating_{i}_{timestamp}", 
+                use_container_width=True,
+                help="Cancel this image generation"
+            ):
+                cancel_generating_image(i)
+        else:
+            # Remove button for failed/timeout/cancelled images
+            if st.button(
+                "🗑️", 
+                key=f"remove_failed_{i}_{timestamp}", 
+                use_container_width=True,
+                help=f"Remove this {status} image"
+            ):
+                remove_failed_image(i)
 
 
 def render_thumbnail_caption(item):
@@ -167,28 +268,68 @@ def thumbnail_gallery():
                     st.session_state.selected_image_index = selected_index
                     st.rerun()
     
-    # Display generating images separately (non-clickable)
-    generating_items = [(i, item) for i, item in enumerate(st.session_state.review_queue) if item['image'] is None]
-    if generating_items:
-        st.markdown("**Generating:**")
-        for i, item in generating_items:
-            render_generating_thumbnail(i, item)
+    # Display generating images and failed/timeout/cancelled images separately (non-clickable)
+    non_ready_items = []
+    for i, item in enumerate(st.session_state.review_queue):
+        status = item.get('status', 'generating' if item['image'] is None else 'ready')
+        if item['image'] is None or status in ['generating', 'failed', 'timeout', 'cancelled']:
+            non_ready_items.append((i, item))
+    
+    if non_ready_items:
+        # Group by status for better organization
+        generating_items = [(i, item) for i, item in non_ready_items if item.get('status', 'generating') == 'generating']
+        failed_items = [(i, item) for i, item in non_ready_items if item.get('status') in ['failed', 'timeout', 'cancelled']]
+        
+        if generating_items:
+            st.markdown("**Generating:**")
+            for i, item in generating_items:
+                render_generating_thumbnail(i, item)
+        
+        if failed_items:
+            st.markdown("**Failed/Cancelled:**")
+            for i, item in failed_items:
+                render_generating_thumbnail(i, item)
 
 
 def render_gallery_stats():
     """Render gallery statistics"""
     total_images = len(st.session_state.review_queue)
-    generating_count = st.session_state.image_states.count('generating')
-    ready_count = st.session_state.image_states.count('ready')
-    failed_count = st.session_state.image_states.count('failed')
     
-    col1, col2, col3 = st.columns(3)
+    # Count by actual status from review_queue items, not just image_states
+    ready_count = 0
+    generating_count = 0
+    failed_count = 0
+    timeout_count = 0
+    cancelled_count = 0
+    
+    for item in st.session_state.review_queue:
+        status = item.get('status', 'generating' if item['image'] is None else 'ready')
+        if status == 'ready':
+            ready_count += 1
+        elif status == 'generating':
+            generating_count += 1
+        elif status == 'failed':
+            failed_count += 1
+        elif status == 'timeout':
+            timeout_count += 1
+        elif status == 'cancelled':
+            cancelled_count += 1
+    
+    # Calculate total errors
+    error_count = failed_count + timeout_count + cancelled_count
+    
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Total", total_images)
     with col2:
         st.metric("Ready", ready_count)
     with col3:
         st.metric("Generating", generating_count)
+    with col4:
+        if error_count > 0:
+            st.metric("Errors", error_count, delta=f"F:{failed_count} T:{timeout_count} C:{cancelled_count}")
+        else:
+            st.metric("Errors", 0)
 
 
 def load_mock_images():
@@ -245,7 +386,7 @@ def load_mock_images():
                     'type': 'text_to_image',
                     'prompt': f"Mock image {i+1} from {os.path.basename(image_path)}",
                     'original_filename': os.path.basename(image_path),
-                    'timestamp': f"Mock_{i+1}",
+                    'timestamp': time.time() + i,  # Use proper timestamp
                 }
                 
                 mock_items.append(mock_item)
@@ -260,7 +401,7 @@ def load_mock_images():
             'image': None,
             'type': 'text_to_image', 
             'prompt': f"Mock generating image {i+1} - this is a longer prompt to test text truncation functionality",
-            'timestamp': f"Mock_Gen_{i+1}",
+            'timestamp': time.time() + 100 + i,  # Use proper timestamp
         }
         mock_items.append(mock_item)
         mock_states.append('generating')

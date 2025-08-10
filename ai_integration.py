@@ -26,10 +26,12 @@ class AIImageGenerator:
         
         print("✅ AIImageGenerator: Initialization complete")
     
-    def generate_from_text(self, prompt: str, size: str = None, quality: str = None) -> Optional[Image.Image]:
+    def generate_from_text(self, prompt: str, size: str = None, quality: str = None, logger_callback=None) -> Optional[Image.Image]:
         """Generate an image from a text prompt using GPT-image-1"""
         try:
             print(f"🔄 Generating image: {prompt[:50]}...")
+            if logger_callback:
+                logger_callback(f"🔄 Starting generation: {prompt[:50]}...")
             
             response = self.client.images.generate(
                 model="gpt-image-1",
@@ -40,19 +42,28 @@ class AIImageGenerator:
             )
             
             print("✅ Image generated successfully")
+            if logger_callback:
+                logger_callback(f"✅ Generation completed: {prompt[:50]}...")
             
             # GPT-image-1 returns base64 encoded images by default
             image_b64 = response.data[0].b64_json
             return self._decode_base64_image(image_b64)
             
         except Exception as e:
-            print(f"❌ Error generating image: {str(e)}")
-            return None
+            error_msg = f"❌ Generation failed: {prompt[:50]}... - {str(e)}"
+            print(error_msg)
+            if logger_callback:
+                logger_callback(error_msg)
+            # Re-raise the exception so the background task can handle cancellation
+            raise e
     
-    def modify_image(self, image: Image.Image, prompt: str = None, quality: str = None) -> Optional[Image.Image]:
+    def modify_image(self, image: Image.Image, prompt: str = None, quality: str = None, logger_callback=None) -> Optional[Image.Image]:
         """Modify an existing image using GPT-image-1 edit API via direct HTTP request"""
         try:
             print("🔄 Modifying image...")
+            if logger_callback:
+                logger_callback(f"🔄 Starting modification: {prompt[:50] if prompt else 'Enhancement'}...")
+            
             # Use default enhancement prompt if none provided
             if not prompt:
                 prompt = "Enhance this image to make it more vibrant, clear, and visually appealing while maintaining its original composition and style."
@@ -92,13 +103,18 @@ class AIImageGenerator:
             
             # Print detailed error info if request fails
             if response.status_code != 200:
+                error_details = f"HTTP {response.status_code}: {response.text}"
                 print(f"❌ HTTP Status: {response.status_code}")
                 print(f"❌ Response Headers: {dict(response.headers)}")
                 print(f"❌ Response Text: {response.text}")
+                if logger_callback:
+                    logger_callback(f"❌ HTTP Error: {error_details}")
             
             response.raise_for_status()
             
             print("✅ Image modified successfully")
+            if logger_callback:
+                logger_callback(f"✅ Modification completed: {prompt[:50]}...")
             
             # Parse response JSON
             response_data = response.json()
@@ -108,9 +124,12 @@ class AIImageGenerator:
             return self._decode_base64_image(image_b64)
             
         except Exception as e:
-            print(f"❌ Error modifying image: {str(e)}")
-            # Fallback: return original image if modification fails
-            return image
+            error_msg = f"❌ Modification failed: {prompt[:50] if prompt else 'Enhancement'}... - {str(e)}"
+            print(error_msg)
+            if logger_callback:
+                logger_callback(error_msg)
+            # Re-raise the exception so the background task can handle cancellation
+            raise e
     
       
     def _download_image(self, url: str) -> Optional[Image.Image]:
