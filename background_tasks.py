@@ -4,13 +4,14 @@ Handles concurrent image generation and status checking.
 """
 import streamlit as st
 import time
+import uuid
 from typing import List
 from PIL import Image
 from concurrent.futures import TimeoutError
 import threading
 
 from ai_integration import AIImageGenerator
-from state_manager import add_log
+from state_manager import add_log, update_item_by_id
 
 # Timeout settings
 TASK_TIMEOUT = 90  # 1 minute and 30 seconds
@@ -29,7 +30,7 @@ def thread_safe_log(message: str):
 
 
 def check_background_tasks():
-    """Check and update completed background generation tasks"""
+    """Simplified UUID-based task checking"""
     # Process any pending logs first
     if hasattr(st.session_state, 'pending_logs') and st.session_state.pending_logs:
         for log_message in st.session_state.pending_logs:
@@ -45,6 +46,11 @@ def check_background_tasks():
     for future_info in st.session_state.background_futures:
         future = future_info['future']
         current_time = time.time()
+        item_id = future_info.get('item_id')
+        
+        if not item_id:
+            # Skip futures without item_id (legacy)
+            continue
         
         # Check if the task is actually running (not just queued)
         if future.running():
@@ -58,19 +64,14 @@ def check_background_tasks():
             
             # Check if task has timed out (only while actually processing)
             if elapsed_time > TASK_TIMEOUT:
-                queue_index = future_info['queue_index']
                 prompt = future_info['prompt']
                 
                 # Cancel the future task
                 future.cancel()
                 add_log(f"⏰ Timeout ({TASK_TIMEOUT}s): {prompt[:40]}...")
                 
-                # Mark as failed due to timeout
-                if queue_index < len(st.session_state.image_states):
-                    st.session_state.image_states[queue_index] = 'failed'
-                if queue_index < len(st.session_state.review_queue):
-                    st.session_state.review_queue[queue_index]['status'] = 'timeout'
-                
+                # Simple atomic update using helper function
+                update_item_by_id(item_id, {'status': 'timeout'})
                 completed_any = True
                 continue
         
@@ -78,38 +79,28 @@ def check_background_tasks():
             try:
                 # Try to get result with a short timeout to avoid blocking
                 image = future.result(timeout=0.1)
-                queue_index = future_info['queue_index']
                 prompt = future_info['prompt']
                 
-                if image and queue_index < len(st.session_state.review_queue):
-                    # Update the existing item with the generated image
-                    st.session_state.review_queue[queue_index]['image'] = image
-                    st.session_state.review_queue[queue_index]['status'] = 'ready'
-                    if queue_index < len(st.session_state.image_states):
-                        st.session_state.image_states[queue_index] = 'ready'
+                if image:
+                    # Simple atomic update using helper function
+                    update_item_by_id(item_id, {'image': image, 'status': 'ready'})
                     st.session_state.stats['generated'] += 1
                     add_log(f"✅ Completed: {prompt[:40]}...")
                     completed_any = True
+                else:
+                    update_item_by_id(item_id, {'status': 'failed'})
+                    add_log(f"❌ No image returned: {prompt[:40]}...")
+                    completed_any = True
             except TimeoutError:
                 # Task completed but result retrieval timed out
-                queue_index = future_info['queue_index']
                 prompt = future_info['prompt']
                 add_log(f"⏰ Result timeout: {prompt[:40]}...")
-                # Mark as failed
-                if queue_index < len(st.session_state.image_states):
-                    st.session_state.image_states[queue_index] = 'failed'
-                if queue_index < len(st.session_state.review_queue):
-                    st.session_state.review_queue[queue_index]['status'] = 'timeout'
+                update_item_by_id(item_id, {'status': 'timeout'})
                 completed_any = True
             except Exception as e:
-                queue_index = future_info['queue_index']
                 prompt = future_info['prompt']
-                add_log(f"❌ Task cancelled due to error: {prompt[:40]}... - {str(e)}")
-                # Mark as failed
-                if queue_index < len(st.session_state.image_states):
-                    st.session_state.image_states[queue_index] = 'failed'
-                if queue_index < len(st.session_state.review_queue):
-                    st.session_state.review_queue[queue_index]['status'] = 'failed'
+                add_log(f"❌ Task failed: {prompt[:40]}... - {str(e)}")
+                update_item_by_id(item_id, {'status': 'failed'})
                 completed_any = True
         else:
             remaining_futures.append(future_info)
@@ -137,8 +128,10 @@ def generate_from_prompts(prompts: List[str]):
     
     # Add placeholder items with 'generating' status
     for i, prompt in enumerate(prompts):
+        item_id = str(uuid.uuid4())  # Generate unique ID
         add_log(f"📝 Adding prompt {i+1}: {prompt[:50]}...")
         st.session_state.review_queue.append({
+            'id': item_id,  # Unique identifier
             'type': 'text_to_image',
             'image': None,  # Will be filled when generation completes
             'prompt': prompt,
@@ -155,8 +148,11 @@ def generate_from_prompts(prompts: List[str]):
     # Get quality setting from session state
     quality = getattr(st.session_state, 'image_quality', 'low')
     
-    for i, prompt in enumerate(prompts):
-        queue_index = len(st.session_state.review_queue) - len(prompts) + i
+    # Get the items we just added (they have the UUIDs we need)
+    recent_items = st.session_state.review_queue[-len(prompts):]
+    
+    for i, (prompt, item) in enumerate(zip(prompts, recent_items)):
+        item_id = item['id']
         add_log(f"🎯 Submitting background task {i+1}: {prompt[:30]}...")
         future = st.session_state.executor.submit(ai_generator.generate_from_text, prompt, quality=quality, logger_callback=thread_safe_log)
         
@@ -164,7 +160,7 @@ def generate_from_prompts(prompts: List[str]):
         st.session_state.background_futures.append({
             'future': future,
             'prompt': prompt,
-            'queue_index': queue_index,
+            'item_id': item_id,  # Use UUID instead of index
             'type': 'text_to_image'
         })
     
@@ -184,6 +180,7 @@ def process_images(uploaded_files, modification_prompt: str):
         return
     
     # Add placeholder items with 'generating' status
+    item_ids = []  # Store item IDs for later reference
     for uploaded_file in uploaded_files:
         try:
             original_image = Image.open(uploaded_file)
@@ -192,8 +189,12 @@ def process_images(uploaded_files, modification_prompt: str):
             # Convert to RGB if necessary for consistency
             if original_image.mode not in ('RGB', 'RGBA'):
                 original_image = original_image.convert('RGB')
-                
+            
+            item_id = str(uuid.uuid4())  # Generate unique ID
+            item_ids.append(item_id)
+            
             st.session_state.review_queue.append({
+                'id': item_id,  # Unique identifier
                 'type': 'image_to_image',
                 'image': None,  # Will be filled when generation completes
                 'original_image': original_image,
@@ -213,9 +214,8 @@ def process_images(uploaded_files, modification_prompt: str):
     # Get quality setting from session state
     quality = getattr(st.session_state, 'image_quality', 'low')
     
-    for i, uploaded_file in enumerate(uploaded_files):
+    for i, (uploaded_file, item_id) in enumerate(zip(uploaded_files, item_ids)):
         try:
-            queue_index = len(st.session_state.review_queue) - len(uploaded_files) + i
             original_image = Image.open(uploaded_file)
             # Verify the image is valid
             original_image.load()
@@ -229,7 +229,7 @@ def process_images(uploaded_files, modification_prompt: str):
             st.session_state.background_futures.append({
                 'future': future,
                 'prompt': f"Transform {uploaded_file.name}",
-                'queue_index': queue_index,
+                'item_id': item_id,  # Use UUID instead of index
                 'type': 'image_to_image'
             })
             
@@ -262,6 +262,7 @@ def modify_image(current_item, modify_prompt: str):
     # Create a placeholder for the new transformed image
     new_item = {
         **current_item,
+        'id': str(uuid.uuid4()),  # Generate new unique ID
         'image': None,  # Will be filled when generation completes
         'timestamp': time.time(),
         'status': 'generating'
@@ -287,8 +288,8 @@ def modify_image(current_item, modify_prompt: str):
     st.session_state.review_queue.append(new_item)
     st.session_state.image_states.append('generating')
     
-    # Submit background task - queue_index is now correct
-    queue_index = len(st.session_state.review_queue) - 1
+    # Get the new item ID for tracking
+    new_item_id = new_item['id']
     
     # Get quality setting from session state
     quality = getattr(st.session_state, 'image_quality', 'low')
@@ -307,7 +308,7 @@ def modify_image(current_item, modify_prompt: str):
     st.session_state.background_futures.append({
         'future': future,
         'prompt': task_description,
-        'queue_index': queue_index,
+        'item_id': new_item_id,  # Use UUID instead of index
         'type': current_item['type']
     })
     

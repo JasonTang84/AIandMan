@@ -4,62 +4,82 @@ Thumbnail sidebar UI component.
 import streamlit as st
 import os
 import time
+import uuid
 from PIL import Image
 from st_clickable_images import clickable_images
 import base64
 import io
 from dotenv import load_dotenv
-from state_manager import remove_from_queue, add_log
+from state_manager import remove_from_queue, add_log, remove_item_by_id, find_item_index_by_id
 
 # Load environment variables
 load_dotenv()
 
 
-def cancel_generating_image(index):
+def cancel_generating_image(item_id):
     """Cancel a generating image and remove it from the queue"""
     try:
+        # Find the item index for logging
+        item_index = find_item_index_by_id(item_id)
+        if item_index == -1:
+            st.error("Image not found in queue")
+            return
+        
         # Try to cancel the background task if it exists
         cancelled_task = False
         if st.session_state.background_futures:
             for i, future_info in enumerate(st.session_state.background_futures):
-                if future_info['queue_index'] == index:
+                if future_info.get('item_id') == item_id:
                     future = future_info['future']
                     if not future.done():
                         cancelled = future.cancel()
                         if cancelled:
                             cancelled_task = True
-                            add_log(f"🛑 Cancelled background task for image {index + 1}")
+                            add_log(f"🛑 Cancelled background task for image {item_index + 1}")
                         else:
-                            add_log(f"⚠️ Could not cancel background task for image {index + 1} (already running)")
+                            add_log(f"⚠️ Could not cancel background task for image {item_index + 1} (already running)")
                     
                     # Remove from background futures list
                     st.session_state.background_futures.pop(i)
                     break
         
-        # Remove the image from the queue
-        remove_from_queue(index)
+        # Remove the image from the queue using simplified helper
+        success = remove_item_by_id(item_id)
         
-        if cancelled_task:
-            st.success(f"✅ Cancelled generation and removed image {index + 1}")
+        if success:
+            if cancelled_task:
+                st.success(f"✅ Cancelled generation and removed image {item_index + 1}")
+            else:
+                st.success(f"✅ Removed image {item_index + 1} from queue")
+            st.rerun()
         else:
-            st.success(f"✅ Removed image {index + 1} from queue")
-        st.rerun()
+            st.error("Failed to remove image from queue")
     except Exception as e:
         st.error(f"Error cancelling image: {str(e)}")
 
 
-def remove_failed_image(index):
+def remove_failed_image(item_id):
     """Remove a failed/timeout/cancelled image from the queue"""
     try:
-        item = st.session_state.review_queue[index]
+        # Find the item index for logging
+        item_index = find_item_index_by_id(item_id)
+        if item_index == -1:
+            st.error("Image not found in queue")
+            return
+            
+        # Get status for logging
+        item = st.session_state.review_queue[item_index]
         status = item.get('status', 'unknown')
         
-        # Remove the image from the queue
-        remove_from_queue(index)
+        # Remove the image from the queue using simplified helper
+        success = remove_item_by_id(item_id)
         
-        add_log(f"🗑️ Removed {status} image {index + 1}")
-        st.success(f"✅ Removed {status} image from queue")
-        st.rerun()
+        if success:
+            add_log(f"🗑️ Removed {status} image {item_index + 1}")
+            st.success(f"✅ Removed {status} image from queue")
+            st.rerun()
+        else:
+            st.error("Failed to remove image from queue")
     except Exception as e:
         st.error(f"Error removing image: {str(e)}")
 
@@ -93,6 +113,7 @@ def image_to_bytes(image: Image.Image) -> bytes:
 def render_generating_thumbnail(i, item):
     """Render thumbnail for a generating image"""
     status = item.get('status', 'generating')
+    item_id = item.get('id', f'legacy_{i}')  # Fallback for items without UUID
     
     with st.container():
         if status == 'generating':
@@ -151,20 +172,20 @@ def render_generating_thumbnail(i, item):
             # Cancel button for generating images
             if st.button(
                 "❌", 
-                key=f"cancel_generating_{i}_{timestamp}", 
+                key=f"cancel_generating_{item_id}_{timestamp}", 
                 use_container_width=True,
                 help="Cancel this image generation"
             ):
-                cancel_generating_image(i)
+                cancel_generating_image(item_id)
         else:
             # Remove button for failed/timeout/cancelled images
             if st.button(
                 "🗑️", 
-                key=f"remove_failed_{i}_{timestamp}", 
+                key=f"remove_failed_{item_id}_{timestamp}", 
                 use_container_width=True,
                 help=f"Remove this {status} image"
             ):
-                remove_failed_image(i)
+                remove_failed_image(item_id)
 
 
 def render_thumbnail_caption(item):
@@ -266,6 +287,10 @@ def thumbnail_gallery():
                 current_selected = st.session_state.get('selected_image_index', -1)
                 if selected_index != current_selected:
                     st.session_state.selected_image_index = selected_index
+                    # Also store the selected item ID for more robust tracking
+                    if selected_index < len(st.session_state.review_queue):
+                        selected_item = st.session_state.review_queue[selected_index]
+                        st.session_state.selected_image_id = selected_item.get('id')
                     st.rerun()
     
     # Display generating images and failed/timeout/cancelled images separately (non-clickable)
@@ -382,11 +407,13 @@ def load_mock_images():
                 
                 # Create mock item
                 mock_item = {
+                    'id': str(uuid.uuid4()),  # Add UUID
                     'image': image,
                     'type': 'text_to_image',
                     'prompt': f"Mock image {i+1} from {os.path.basename(image_path)}",
                     'original_filename': os.path.basename(image_path),
                     'timestamp': time.time() + i,  # Use proper timestamp
+                    'status': 'ready'
                 }
                 
                 mock_items.append(mock_item)
@@ -398,10 +425,12 @@ def load_mock_images():
     # Add some generating placeholders for testing
     for i in range(2):  # Add 2 generating placeholders
         mock_item = {
+            'id': str(uuid.uuid4()),  # Add UUID
             'image': None,
             'type': 'text_to_image', 
             'prompt': f"Mock generating image {i+1} - this is a longer prompt to test text truncation functionality",
             'timestamp': time.time() + 100 + i,  # Use proper timestamp
+            'status': 'generating'
         }
         mock_items.append(mock_item)
         mock_states.append('generating')

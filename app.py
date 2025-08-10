@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import os
 
 # Import modular components
-from state_manager import init_session_state
+from state_manager import init_session_state, sync_selected_index
 from background_tasks import check_background_tasks
 from ui.styling import apply_page_config, apply_custom_css, render_background_task_status
 from ui.sidebar import render_sidebar
@@ -75,6 +75,9 @@ def main():
     
     # Initialize session state
     init_session_state()
+    
+    # Sync selected index with selected item ID (handles UUID-based tracking)
+    sync_selected_index()
     
     # Start background task monitoring (only if tasks exist)
     if st.session_state.background_futures:

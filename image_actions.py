@@ -46,13 +46,14 @@ def create_download_button(current_item, disabled=False):
     if not image_data:
         return st.button("✅ Accept", type="primary", use_container_width=True, disabled=True, help="Error preparing image")
     
-    # Create a unique key for this download based on timestamp and index
+    # Create a unique key for this download based on item ID and timestamp
+    item_id = current_item.get('id', 'unknown')
     try:
         timestamp = int(current_item.get('timestamp', 0))
     except (ValueError, TypeError):
         timestamp = int(time.time())
     
-    download_key = f"download_{timestamp}_{st.session_state.selected_image_index}"
+    download_key = f"download_{item_id}_{timestamp}"
     
     downloaded = st.download_button(
         label="✅ Accept & Download",
