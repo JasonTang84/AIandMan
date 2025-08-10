@@ -156,6 +156,10 @@ def render_action_controls(current_item):
                 generate_new_image(modify_prompt)
     
     with col_redo:
-        if st.button("🔄 Redo", use_container_width=True, help="Regenerate with new prompt", disabled=disabled or not modify_prompt.strip()):
-            if modify_prompt.strip() and current_item:
-                modify_image(current_item, modify_prompt)
+        if st.button("🔄 Redo", use_container_width=True, help="Regenerate with new prompt", disabled=not modify_prompt.strip()):
+            if modify_prompt.strip():
+                if current_item:
+                    modify_image(current_item, modify_prompt)
+                else:
+                    # Do nothing if there's no current image
+                    pass
