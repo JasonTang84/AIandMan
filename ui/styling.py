@@ -119,13 +119,9 @@ def apply_custom_css():
 def render_background_task_status():
     """Render background task status indicator"""
     if st.session_state.background_futures:
-        active_tasks = len(st.session_state.background_futures)
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.markdown(f'<div style="color: #1f77b4;"><span class="processing-spinner">🔄</span> <span class="processing-dots">Generating {active_tasks} images in background</span></div>', unsafe_allow_html=True)
-        with col2:
-            if st.button("🔄 Refresh", help="Check for completed images"):
-                st.rerun()
+        # Show refresh button
+        if st.button("🔄 Refresh", help="Check for completed images"):
+            st.rerun()
         
         # Show progress in the bottom
         generating_count = st.session_state.image_states.count('generating')

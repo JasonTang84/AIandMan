@@ -11,6 +11,7 @@ import base64
 import io
 from dotenv import load_dotenv
 from state_manager import remove_from_queue, add_log, remove_item_by_id, find_item_index_by_id
+from ui.styling import render_background_task_status
 
 # Load environment variables
 load_dotenv()
@@ -93,6 +94,9 @@ def render_thumbnail_sidebar():
     
     with st.container():
         thumbnail_gallery()
+        
+        # Render background task status at the bottom of thumbnail sidebar
+        render_background_task_status()
 
 
 @st.cache_data

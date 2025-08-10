@@ -9,7 +9,7 @@ import os
 # Import modular components
 from state_manager import init_session_state, sync_selected_index
 from background_tasks import check_background_tasks
-from ui.styling import apply_page_config, apply_custom_css, render_background_task_status
+from ui.styling import apply_page_config, apply_custom_css
 from ui.sidebar import render_sidebar
 from ui.main_content import render_main_content
 from ui.thumbnail_sidebar import render_thumbnail_sidebar
@@ -105,9 +105,6 @@ def main():
     
     with col_right:
         render_thumbnail_sidebar()
-    
-    # Render background task status at the bottom
-    render_background_task_status()
 
 
 if __name__ == "__main__":
