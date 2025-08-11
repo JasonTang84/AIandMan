@@ -6,9 +6,6 @@ import os
 import time
 import uuid
 from PIL import Image
-from st_clickable_images import clickable_images
-import base64
-import io
 from dotenv import load_dotenv
 from state_manager import remove_from_queue, add_log, remove_item_by_id, find_item_index_by_id
 from ui.styling import render_background_task_status
@@ -99,19 +96,10 @@ def render_thumbnail_sidebar():
         render_background_task_status()
 
 
-@st.cache_data
-def pil_to_base64(image_bytes: bytes) -> str:
-    """Convert PIL Image bytes to base64 string for st-clickable-images"""
-    img_str = base64.b64encode(image_bytes).decode()
-    return f"data:image/png;base64,{img_str}"
+# Removed pil_to_base64 function - no longer needed with st.image approach
 
 
-def image_to_bytes(image: Image.Image) -> bytes:
-    """Convert PIL Image to bytes"""
-    img_buffer = io.BytesIO()
-    image.save(img_buffer, format='PNG')
-    img_buffer.seek(0)
-    return img_buffer.getvalue()
+# Removed image_to_bytes function - no longer needed with st.image approach
 
 
 def render_generating_thumbnail(i, item):
@@ -225,77 +213,70 @@ def thumbnail_gallery():
     if not has_ready_images:
         st.info("No ready images to display")
     else:
-        # Prepare images for clickable_images only if needed
-        ready_images = []
-        image_indices = []
-        captions = []
-        
+        # Display ready images using st.image with select buttons
+        ready_items = []
         for i, item in enumerate(st.session_state.review_queue):
             if item['image'] is not None:
-                # Convert PIL Image to base64 string using cached function
-                image_bytes = image_to_bytes(item['image'])
-                image_b64 = pil_to_base64(image_bytes)
-                ready_images.append(image_b64)
-                image_indices.append(i)
-                # Create caption
-                if item['type'] == 'text_to_image':
-                    prompt_preview = item['prompt'][:20] + "..." if len(item['prompt']) > 20 else item['prompt']
-                    captions.append(f"{prompt_preview}")
-                else:
-                    filename = item.get('original_filename', 'Image')
-                    short_filename = filename[:15] + "..." if len(filename) > 15 else filename
-                    captions.append(f"{short_filename}")
+                ready_items.append((i, item))
         
-        # Display clickable images for ready images
-        if ready_images:
-            st.markdown("**Click image to select:**")
+        if ready_items:
+            st.markdown("**Click Select to choose an image:**")
             
             # Show which image is currently selected
             current_selected = st.session_state.get('selected_image_index', -1)
             if current_selected >= 0 and current_selected < len(st.session_state.review_queue):
                 selected_item = st.session_state.review_queue[current_selected]
                 if selected_item['image'] is not None:
-                    # Find if the selected image is in our ready images list
-                    for idx, orig_idx in enumerate(image_indices):
+                    # Find the display position of the selected image
+                    display_position = None
+                    for display_idx, (orig_idx, _) in enumerate(ready_items):
                         if orig_idx == current_selected:
-                            st.markdown(f"🟢 **Selected: Image {idx + 1}**")
+                            display_position = display_idx + 1
                             break
+                    if display_position:
+                        st.markdown(f"🟢 **Selected: Image {display_position}**")
             
-            clicked = clickable_images(
-                ready_images,
-                titles=captions,
-                div_style={
-                    "display": "flex", 
-                    "justify-content": "center", 
-                    "flex-wrap": "wrap",
-                    "flex-direction": "column",
-                    "align-items": "center",
-                    "gap": "2px"
-                },
-                img_style={
-                    "margin": "1px", 
-                    "height": "100px", 
-                    "width": "auto",
-                    "max-width": "110px",
-                    "cursor": "pointer", 
-                    "border-radius": "4px",
-                    "border": "2px solid transparent",
-                    "transition": "border-color 0.2s ease"
-                },
-                key="thumbnail_gallery"
-            )
-            
-            # Handle click - only rerun if selection actually changed
-            if clicked >= 0 and clicked < len(image_indices):
-                selected_index = image_indices[clicked]
-                current_selected = st.session_state.get('selected_image_index', -1)
-                if selected_index != current_selected:
-                    st.session_state.selected_image_index = selected_index
-                    # Also store the selected item ID for more robust tracking
-                    if selected_index < len(st.session_state.review_queue):
-                        selected_item = st.session_state.review_queue[selected_index]
-                        st.session_state.selected_image_id = selected_item.get('id')
-                    st.rerun()
+            # Display each ready image with select button
+            for display_idx, (original_idx, item) in enumerate(ready_items):
+                item_id = item.get('id', f'legacy_{original_idx}')
+                timestamp = int(item.get('timestamp', time.time()))
+                
+                with st.container():
+                    # Display the image
+                    st.image(
+                        item['image'], 
+                        width=110,  # Fixed width for consistent thumbnails
+                        caption=None  # We'll add caption separately for better control
+                    )
+                    
+                    # Add caption below image
+                    if item['type'] == 'text_to_image':
+                        prompt_preview = item['prompt'][:20] + "..." if len(item['prompt']) > 20 else item['prompt']
+                        st.caption(f"{prompt_preview}")
+                    else:
+                        filename = item.get('original_filename', 'Image')
+                        short_filename = filename[:15] + "..." if len(filename) > 15 else filename
+                        st.caption(f"{short_filename}")
+                    
+                    # Add select button
+                    is_selected = current_selected == original_idx
+                    button_text = "✅ Selected" if is_selected else "Select"
+                    button_type = "secondary" if is_selected else "primary"
+                    
+                    if st.button(
+                        button_text,
+                        key=f"select_image_{item_id}_{timestamp}",
+                        use_container_width=True,
+                        type=button_type,
+                        disabled=is_selected
+                    ):
+                        # Update selection
+                        st.session_state.selected_image_index = original_idx
+                        st.session_state.selected_image_id = item_id
+                        st.rerun()
+                    
+                    # Add small spacer between images
+                    st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
     
     # Display generating images and failed/timeout/cancelled images separately (non-clickable)
     non_ready_items = []
