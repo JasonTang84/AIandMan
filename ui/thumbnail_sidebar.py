@@ -108,88 +108,95 @@ def render_generating_thumbnail(i, item):
     item_id = item.get('id', f'legacy_{i}')  # Fallback for items without UUID
     
     with st.container():
-        if status == 'generating':
-            # Create a placeholder box with animated processing text
-            st.markdown("""
-            <div style="
-                background-color: #f0f0f0;
-                border: 1px dashed #ccc;
-                height: 100px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border-radius: 6px;
-                margin: 1px 0;
-                cursor: pointer;
-            " onclick="this.style.backgroundColor='#e0e0e0';">
-                <div style="text-align: center; color: #666;">
-                    <div class="processing-spinner" style="font-size: 16px;">🔄</div>
-                    <div class="processing-dots" style="font-size: 10px;">Generating...</div>
+        # Create columns for placeholder and button side by side
+        col1, col2 = st.columns([3, 1])  # Placeholder gets 3/4 width, button gets 1/4
+        
+        with col1:
+            if status == 'generating':
+                # Create a placeholder box with animated processing text
+                st.markdown("""
+                <div style="
+                    background-color: #f0f0f0;
+                    border: 1px dashed #ccc;
+                    height: 90px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 6px;
+                    margin: 1px 0;
+                ">
+                    <div style="text-align: center; color: #666;">
+                        <div class="processing-spinner" style="font-size: 16px;">🔄</div>
+                        <div class="processing-dots" style="font-size: 10px;">Generating...</div>
+                    </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
-        elif status in ['failed', 'timeout', 'cancelled']:
-            # Create an error placeholder box
-            error_icon = "⏰" if status == 'timeout' else "❌" if status == 'failed' else "🛑"
-            error_text = "Timed Out" if status == 'timeout' else "Failed" if status == 'failed' else "Cancelled"
+                """, unsafe_allow_html=True)
+            elif status in ['failed', 'timeout', 'cancelled']:
+                # Create an error placeholder box
+                error_icon = "⏰" if status == 'timeout' else "❌" if status == 'failed' else "🛑"
+                error_text = "Timed Out" if status == 'timeout' else "Failed" if status == 'failed' else "Cancelled"
+                
+                st.markdown(f"""
+                <div style="
+                    background-color: #ffe6e6;
+                    border: 1px solid #ff9999;
+                    height: 90px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 6px;
+                    margin: 1px 0;
+                ">
+                    <div style="text-align: center; color: #cc0000;">
+                        <div style="font-size: 16px;">{error_icon}</div>
+                        <div style="font-size: 10px;">{error_text}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
             
-            st.markdown(f"""
-            <div style="
-                background-color: #ffe6e6;
-                border: 1px solid #ff9999;
-                height: 100px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border-radius: 6px;
-                margin: 1px 0;
-            ">
-                <div style="text-align: center; color: #cc0000;">
-                    <div style="font-size: 16px;">{error_icon}</div>
-                    <div style="font-size: 10px;">{error_text}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            # Show truncated prompt as caption
+            render_thumbnail_caption(item)
         
-        # Show truncated prompt as caption
-        render_thumbnail_caption(item)
-        
-        # Add cancel/remove button based on status
-        try:
-            timestamp = int(item.get('timestamp', 0))
-        except (ValueError, TypeError):
-            timestamp = int(time.time())
-        
-        if status == 'generating':
-            # Cancel button for generating images
-            if st.button(
-                "❌", 
-                key=f"cancel_generating_{item_id}_{timestamp}", 
-                use_container_width=True,
-                help="Cancel this image generation"
-            ):
-                cancel_generating_image(item_id)
-        else:
-            # Remove button for failed/timeout/cancelled images
-            if st.button(
-                "🗑️", 
-                key=f"remove_failed_{item_id}_{timestamp}", 
-                use_container_width=True,
-                help=f"Remove this {status} image"
-            ):
-                remove_failed_image(item_id)
+        with col2:
+            # Add some vertical spacing to center the button with placeholder
+            st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+            
+            # Add cancel/remove button based on status
+            try:
+                timestamp = int(item.get('timestamp', 0))
+            except (ValueError, TypeError):
+                timestamp = int(time.time())
+            
+            if status == 'generating':
+                # Cancel button for generating images
+                if st.button(
+                    "❌", 
+                    key=f"cancel_generating_{item_id}_{timestamp}", 
+                    use_container_width=True,
+                    help="Cancel this image generation"
+                ):
+                    cancel_generating_image(item_id)
+            else:
+                # Remove button for failed/timeout/cancelled images
+                if st.button(
+                    "🗑️", 
+                    key=f"remove_failed_{item_id}_{timestamp}", 
+                    use_container_width=True,
+                    help=f"Remove this {status} image"
+                ):
+                    remove_failed_image(item_id)
 
 
 def render_thumbnail_caption(item):
     """Render caption for thumbnail"""
     if item['type'] == 'text_to_image':
-        # Longer prompt preview for better readability
-        prompt_preview = item['prompt'][:50] + "..." if len(item['prompt']) > 50 else item['prompt']
+        # Shorter prompt preview for compact display
+        prompt_preview = item['prompt'][:15] + "..." if len(item['prompt']) > 15 else item['prompt']
         st.caption(f"{prompt_preview}")
     else:
         # Just filename without icon for compact display
         filename = item.get('original_filename', 'Image')
-        short_filename = filename[:15] + "..." if len(filename) > 15 else filename
+        short_filename = filename[:12] + "..." if len(filename) > 12 else filename
         st.caption(f"{short_filename}")
 
 
@@ -220,9 +227,9 @@ def thumbnail_gallery():
                 ready_items.append((i, item))
         
         if ready_items:
-            st.markdown("**Click Select to choose an image:**")
+            st.markdown("**Click pin icon to select an image:**")
             
-            # Show which image is currently selected
+            # Show which image is currently selected (only if one is actually selected)
             current_selected = st.session_state.get('selected_image_index', -1)
             if current_selected >= 0 and current_selected < len(st.session_state.review_queue):
                 selected_item = st.session_state.review_queue[current_selected]
@@ -242,41 +249,50 @@ def thumbnail_gallery():
                 timestamp = int(item.get('timestamp', time.time()))
                 
                 with st.container():
-                    # Display the image
-                    st.image(
-                        item['image'], 
-                        width=110,  # Fixed width for consistent thumbnails
-                        caption=None  # We'll add caption separately for better control
-                    )
+                    # Create columns for image and button side by side
+                    col1, col2 = st.columns([3, 1])  # Image gets 3/4 width, button gets 1/4
                     
-                    # Add caption below image
-                    if item['type'] == 'text_to_image':
-                        prompt_preview = item['prompt'][:20] + "..." if len(item['prompt']) > 20 else item['prompt']
-                        st.caption(f"{prompt_preview}")
-                    else:
-                        filename = item.get('original_filename', 'Image')
-                        short_filename = filename[:15] + "..." if len(filename) > 15 else filename
-                        st.caption(f"{short_filename}")
+                    with col1:
+                        # Display the image
+                        st.image(
+                            item['image'], 
+                            width=90,  # Slightly smaller to fit with button
+                            caption=None  # We'll add caption separately for better control
+                        )
+                        
+                        # Add caption below image
+                        if item['type'] == 'text_to_image':
+                            prompt_preview = item['prompt'][:15] + "..." if len(item['prompt']) > 15 else item['prompt']
+                            st.caption(f"{prompt_preview}")
+                        else:
+                            filename = item.get('original_filename', 'Image')
+                            short_filename = filename[:12] + "..." if len(filename) > 12 else filename
+                            st.caption(f"{short_filename}")
                     
-                    # Add select button
-                    is_selected = current_selected == original_idx
-                    button_text = "✅ Selected" if is_selected else "Select"
-                    button_type = "secondary" if is_selected else "primary"
-                    
-                    if st.button(
-                        button_text,
-                        key=f"select_image_{item_id}_{timestamp}",
-                        use_container_width=True,
-                        type=button_type,
-                        disabled=is_selected
-                    ):
-                        # Update selection
-                        st.session_state.selected_image_index = original_idx
-                        st.session_state.selected_image_id = item_id
-                        st.rerun()
+                    with col2:
+                        # Add some vertical spacing to center the button with image
+                        st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+                        
+                        # Add select button
+                        is_selected = current_selected == original_idx
+                        button_text = "✅" if is_selected else "📌"  # Pin icon for unselected, checkmark for selected
+                        button_type = "secondary" if is_selected else "primary"
+                        
+                        if st.button(
+                            button_text,
+                            key=f"select_image_{item_id}_{timestamp}",
+                            use_container_width=True,
+                            type=button_type,
+                            disabled=is_selected,
+                            help="Select this image" if not is_selected else "Currently selected"
+                        ):
+                            # Update selection
+                            st.session_state.selected_image_index = original_idx
+                            st.session_state.selected_image_id = item_id
+                            st.rerun()
                     
                     # Add small spacer between images
-                    st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
+                    st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
     
     # Display generating images and failed/timeout/cancelled images separately (non-clickable)
     non_ready_items = []
@@ -425,6 +441,4 @@ def load_mock_images():
         st.session_state.review_queue = mock_items
         st.session_state.image_states = mock_states
         
-        # Initialize selected index if not set
-        if 'selected_image_index' not in st.session_state:
-            st.session_state.selected_image_index = 0
+        # Don't auto-select any image - let user choose manually

@@ -38,6 +38,8 @@ def render_image_viewer():
     """Render the main image viewer and controls"""
     current_item = get_current_item()
     if not current_item:
+        # No image selected
+        st.info("📌 No image selected. Click the pin icon on a thumbnail in the right sidebar to select an image for viewing and editing.")
         return
     
     queue_length = len(st.session_state.review_queue)
@@ -82,6 +84,10 @@ def render_generating_state(current_item):
 
 def render_navigation_header(queue_length):
     """Render the navigation header with prev/next buttons"""
+    # Only show navigation if an image is selected
+    if st.session_state.selected_image_index < 0:
+        return
+        
     col1, col2, col3 = st.columns([1, 2, 1])
     with col1:
         if st.button("⬅️ Previous", disabled=st.session_state.selected_image_index == 0):

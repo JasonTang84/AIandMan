@@ -24,7 +24,7 @@ def init_session_state():
         st.session_state.background_futures = []
 
     if 'selected_image_index' not in st.session_state:
-        st.session_state.selected_image_index = 0
+        st.session_state.selected_image_index = -1  # No image selected by default
 
     if 'image_states' not in st.session_state:
         st.session_state.image_states = []  # Track state of each image
@@ -101,10 +101,10 @@ def sync_selected_index():
             st.session_state.selected_image_index = i
             return
     
-    # If selected item not found, reset to first item
-    if st.session_state.review_queue:
-        st.session_state.selected_image_index = 0
-        st.session_state.selected_image_id = st.session_state.review_queue[0].get('id')
+    # If selected item not found, reset to no selection
+    st.session_state.selected_image_index = -1
+    if hasattr(st.session_state, 'selected_image_id'):
+        del st.session_state.selected_image_id
 
 
 def add_log(message: str):
@@ -124,8 +124,9 @@ def get_current_item():
     if not st.session_state.review_queue:
         return None
     
-    if st.session_state.selected_image_index >= len(st.session_state.review_queue):
-        st.session_state.selected_image_index = 0
+    # Return None if no image is selected
+    if st.session_state.selected_image_index < 0 or st.session_state.selected_image_index >= len(st.session_state.review_queue):
+        return None
     
     return st.session_state.review_queue[st.session_state.selected_image_index]
 

@@ -247,8 +247,7 @@ def generate_new_image(prompt: str):
     # Simply call the existing generate_from_prompts with a single prompt
     generate_from_prompts([prompt])
     
-    # Select the newly added image (now at the end)
-    st.session_state.selected_image_index = len(st.session_state.review_queue) - 1
+    # Don't auto-select the newly added image - let user choose manually
 
 
 def modify_image(current_item, modify_prompt: str):
@@ -312,8 +311,7 @@ def modify_image(current_item, modify_prompt: str):
         'type': current_item['type']
     })
     
-    # Select the newly added image (now at the end)
-    st.session_state.selected_image_index = len(st.session_state.review_queue) - 1
+    # Don't auto-select the newly added image - let user choose manually
     
     add_log(f"🔄 Started transformation: {task_description}")
     st.success("🔄 Transformation started! The new image will appear when ready.")
