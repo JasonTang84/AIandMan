@@ -34,7 +34,7 @@ AIandMan is an interactive tool that allows users to generate and modify images 
 If input is an image, showing before/after image; If input is a prompt, showing image with prompt. Then let user to decide
 - **Accept**: Save approved images to configured output folder
 - **Reject**: Discard unwanted images without saving
-- **Modify**: Provide additional prompts for image transformation (queued in background)
+- **Modify**: Create new transformed versions while preserving the original image (queued in background)
 
 #### 5. Queue Management
 - Organized queue system for reviewing multiple generated images

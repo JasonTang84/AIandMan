@@ -277,13 +277,8 @@ def modify_image(current_item, modify_prompt: str):
         new_item['modification_prompt'] = modify_prompt
         task_description = f"Transform image: {modify_prompt[:40]}..."
     
-    # Remove current image from queue first
-    current_index = st.session_state.selected_image_index
-    st.session_state.review_queue.pop(current_index)
-    if current_index < len(st.session_state.image_states):
-        st.session_state.image_states.pop(current_index)
-    
-    # Add placeholder to queue
+    # Keep the original image in place and add the modified version as a new item
+    # Add placeholder to queue (don't remove the original)
     st.session_state.review_queue.append(new_item)
     st.session_state.image_states.append('generating')
     
@@ -313,8 +308,8 @@ def modify_image(current_item, modify_prompt: str):
     
     # Don't auto-select the newly added image - let user choose manually
     
-    add_log(f"🔄 Started transformation: {task_description}")
-    st.success("🔄 Transformation started! The new image will appear when ready.")
+    add_log(f"🔄 Started transformation (keeping original): {task_description}")
+    st.success("🔄 Transformation started! The original image will be kept and the new image will appear when ready.")
     st.rerun()
 
 
