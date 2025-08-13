@@ -21,6 +21,9 @@ def render_main_content():
     current_item = get_current_item()
     render_action_controls(current_item)
     
+    # Add logs section below action controls
+    render_logs_section()
+    
     st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -169,3 +172,19 @@ def render_action_controls(current_item):
                 else:
                     # Do nothing if there's no current image
                     pass
+
+
+def render_logs_section():
+    """Render the generation logs section"""
+    if st.session_state.generation_logs:
+        st.divider()
+        st.header("📋 Generation Logs")
+        
+        # Show last 6 logs
+        recent_logs = st.session_state.generation_logs[-6:]
+        for log in recent_logs:
+            st.text(log)
+        
+        if st.button("Clear Logs"):
+            st.session_state.generation_logs = []
+            st.rerun()

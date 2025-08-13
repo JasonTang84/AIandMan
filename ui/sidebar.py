@@ -25,9 +25,6 @@ def render_sidebar():
     # Image to Image workflow
     st.header("🖼️ Image to Image")
     image_modification_interface()
-    
-    # Generation Logs section
-    render_logs_section()
 
 
 def render_image_quality_setting():
@@ -98,19 +95,3 @@ def image_modification_interface():
     
     if uploaded_files and st.button("Transform Images", type="primary", use_container_width=True):
         process_images(uploaded_files, modification_prompt)
-
-
-def render_logs_section():
-    """Render the generation logs section"""
-    if st.session_state.generation_logs:
-        st.divider()
-        st.header("📋 Generation Logs")
-        
-        # Show last 6 logs
-        recent_logs = st.session_state.generation_logs[-6:]
-        for log in recent_logs:
-            st.text(log)
-        
-        if st.button("Clear Logs"):
-            st.session_state.generation_logs = []
-            st.rerun()
