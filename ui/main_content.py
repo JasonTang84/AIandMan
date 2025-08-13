@@ -8,6 +8,8 @@ from background_tasks import modify_image, generate_new_image
 
 
 def render_main_content():
+    """Render the complete sidebar with all input workflows"""
+    # st.title("🎨 AI & Man(Collaboration Tool)")
     """Render the main content area"""
     st.markdown('<div class="main-content">', unsafe_allow_html=True)
     

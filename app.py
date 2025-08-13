@@ -42,7 +42,8 @@ def check_password():
         return True
     
     # Show login form
-    st.title("🔐 AIandMan Authentication")
+    st.title("🔐 AI & Man Authentication")
+    st.subheader("A collaboration tool for AI and human creativity");
     st.markdown("Please enter the password to access the application.")
     
     with st.form("login_form"):

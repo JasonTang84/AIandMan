@@ -8,10 +8,7 @@ from PIL import Image
 
 
 def render_sidebar():
-    """Render the complete sidebar with all input workflows"""
-    st.title("🎨 AIandMan")
-    st.subheader("AI & Human Collaboration Tool")
-    
+   
     # Image quality configuration
     render_image_quality_setting()
     
