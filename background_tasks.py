@@ -145,8 +145,9 @@ def generate_from_prompts(prompts: List[str]):
     # Submit background tasks without waiting
     add_log(f"🔄 Starting background generation for {len(prompts)} tasks...")
     
-    # Get quality setting from session state
+    # Get quality and resolution settings from session state
     quality = getattr(st.session_state, 'image_quality', 'low')
+    resolution = getattr(st.session_state, 'image_resolution', '1024x1024')
     
     # Get the items we just added (they have the UUIDs we need)
     recent_items = st.session_state.review_queue[-len(prompts):]
@@ -154,7 +155,7 @@ def generate_from_prompts(prompts: List[str]):
     for i, (prompt, item) in enumerate(zip(prompts, recent_items)):
         item_id = item['id']
         add_log(f"🎯 Submitting background task {i+1}: {prompt[:30]}...")
-        future = st.session_state.executor.submit(ai_generator.generate_from_text, prompt, quality=quality, logger_callback=thread_safe_log)
+        future = st.session_state.executor.submit(ai_generator.generate_from_text, prompt, size=resolution, quality=quality, logger_callback=thread_safe_log)
         
         # Store future info for background checking (timeout timer starts only when processing begins)
         st.session_state.background_futures.append({
@@ -211,8 +212,9 @@ def process_images(uploaded_files, modification_prompt: str):
     add_log(f"🔄 Starting background processing for {len(uploaded_files)} images...")
     
     # Submit background tasks without waiting
-    # Get quality setting from session state
+    # Get quality and resolution settings from session state
     quality = getattr(st.session_state, 'image_quality', 'low')
+    resolution = getattr(st.session_state, 'image_resolution', '1024x1024')
     
     for i, (uploaded_file, item_id) in enumerate(zip(uploaded_files, item_ids)):
         try:
@@ -223,7 +225,7 @@ def process_images(uploaded_files, modification_prompt: str):
             if original_image.mode not in ('RGB', 'RGBA'):
                 original_image = original_image.convert('RGB')
             
-            future = st.session_state.executor.submit(ai_generator.modify_image, original_image, modification_prompt, quality=quality, logger_callback=thread_safe_log)
+            future = st.session_state.executor.submit(ai_generator.modify_image, original_image, modification_prompt, size=resolution, quality=quality, logger_callback=thread_safe_log)
             
             # Store future info for background checking (timeout timer starts only when processing begins)
             st.session_state.background_futures.append({
@@ -285,14 +287,15 @@ def modify_image(current_item, modify_prompt: str):
     # Get the new item ID for tracking
     new_item_id = new_item['id']
     
-    # Get quality setting from session state
+    # Get quality and resolution settings from session state
     quality = getattr(st.session_state, 'image_quality', 'low')
+    resolution = getattr(st.session_state, 'image_resolution', '1024x1024')
     
     # When modifying an existing image, always use modify_image regardless of original type
     # Use the current image as the source for modification
     source_image = current_item.get('image') or current_item.get('original_image')
     if source_image:
-        future = st.session_state.executor.submit(ai_generator.modify_image, source_image, modify_prompt, quality=quality, logger_callback=thread_safe_log)
+        future = st.session_state.executor.submit(ai_generator.modify_image, source_image, modify_prompt, size=resolution, quality=quality, logger_callback=thread_safe_log)
     else:
         add_log(f"❌ Error: No source image available for modification")
         st.error("❌ Error: No source image available for modification")

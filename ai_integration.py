@@ -57,7 +57,7 @@ class AIImageGenerator:
             # Re-raise the exception so the background task can handle cancellation
             raise e
     
-    def modify_image(self, image: Image.Image, prompt: str = None, quality: str = None, logger_callback=None) -> Optional[Image.Image]:
+    def modify_image(self, image: Image.Image, prompt: str = None, size: str = None, quality: str = None, logger_callback=None) -> Optional[Image.Image]:
         """Modify an existing image using GPT-image-1 edit API via direct HTTP request"""
         try:
             print("🔄 Modifying image...")
@@ -93,7 +93,7 @@ class AIImageGenerator:
             data = {
                 'model': deployment_name,
                 'prompt': prompt,
-                'size': self.default_size,
+                'size': size or self.default_size,
                 'quality': quality or self.default_quality,
                 'n': '1'
             }

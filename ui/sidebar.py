@@ -25,16 +25,30 @@ def render_sidebar():
 
 
 def render_image_quality_setting():
-    """Render the image quality setting"""
-    # Quality setting for both generation and modification
-    if 'image_quality' not in st.session_state:
-        st.session_state.image_quality = "low"
-    st.session_state.image_quality = st.selectbox(
-        "Image Quality",
-        options=["low", "medium", "high"],
-        index=["low", "medium", "high"].index(st.session_state.image_quality),
-        help="Quality setting for both generation and modification"
-    )
+    """Render the image quality and resolution settings"""
+    col1, col2 = st.columns([2, 3])
+    
+    with col1:
+        # Quality setting for both generation and modification
+        if 'image_quality' not in st.session_state:
+            st.session_state.image_quality = "medium"
+        st.session_state.image_quality = st.selectbox(
+            "Quality",
+            options=["low", "medium", "high"],
+            index=["low", "medium", "high"].index(st.session_state.image_quality),
+            help="Quality setting for both generation and modification"
+        )
+    
+    with col2:
+        # Resolution setting for both generation and modification
+        if 'image_resolution' not in st.session_state:
+            st.session_state.image_resolution = "1024x1536"
+        st.session_state.image_resolution = st.selectbox(
+            "Image Resolution",
+            options=["1024x1024", "1024x1536", "1536x1024"],
+            index=["1024x1024", "1024x1536", "1536x1024"].index(st.session_state.image_resolution),
+            help="Resolution setting for both generation and modification"
+        )
 
 
 def render_statistics():
