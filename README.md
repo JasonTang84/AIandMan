@@ -23,9 +23,6 @@ Transform your creative ideas into stunning images with AIandMan - where AI meet
 
 ### Screenshot Tour
 
-![Main Dashboard](screenshots/main-dashboard.png)
-*Main interface showing the status dashboard and control panel*
-
 ![Image Review Interface](screenshots/review-interface.png)
 *Image review interface with before/after comparison*
 
