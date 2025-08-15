@@ -89,7 +89,7 @@ a magical forest at sunset; cyberpunk city street at night; abstract art with vi
 ```
 Upload this file to generate multiple images at once.
 
-#### Image Processing
+#### Image Processing (Batch Generation)
 - Load your reference images from local folders
 - Apply transformations with a same custom prompt for all images
   ```
