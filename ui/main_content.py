@@ -113,7 +113,13 @@ def render_image_display(current_item):
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        if current_item['type'] == 'text_to_image':
+        # Check if this is a modified image (has source_image)
+        if current_item.get('source_image'):
+            st.markdown("**📸 Before (Source Image):**")
+            st.image(current_item['source_image'], caption="Before modification", use_container_width=True)
+            if current_item.get('modification_prompt'):
+                st.markdown(f"**Transformation:** *{current_item['modification_prompt']}*")
+        elif current_item['type'] == 'text_to_image':
             st.markdown("**🎨 Generated from prompt:**")
             with st.container():
                 st.markdown(f"*\"{current_item['prompt']}\"*")
@@ -125,7 +131,11 @@ def render_image_display(current_item):
                 st.markdown(f"**Transformation:** *{current_item['modification_prompt']}*")
     
     with col2:
-        st.markdown("**✨ Generated Result:**")
+        # Determine the right column title based on whether it's a modification
+        if current_item.get('source_image'):
+            st.markdown("**✨ After (Modified Result):**")
+        else:
+            st.markdown("**✨ Generated Result:**")
         st.image(current_item['image'], caption="Generated", use_container_width=True)
 
 

@@ -269,11 +269,15 @@ def modify_image(current_item, modify_prompt: str):
         'status': 'generating'
     }
     
+    # Store the source image for display purposes (the image being modified)
+    source_image = current_item.get('image') or current_item.get('original_image')
+    new_item['source_image'] = source_image
+    
     # Update prompts based on type
     if current_item['type'] == 'text_to_image':
-        # Combine original prompt with transformation
-        new_item['prompt'] = f"{current_item['prompt']} {modify_prompt}"
-        task_description = f"Transform text: {new_item['prompt'][:40]}..."
+        # For text-to-image modifications, we still want to show the source image on the left
+        new_item['modification_prompt'] = modify_prompt
+        task_description = f"Transform text-generated image: {modify_prompt[:40]}..."
     else:
         # Keep modification prompt for image transformation
         new_item['modification_prompt'] = modify_prompt
