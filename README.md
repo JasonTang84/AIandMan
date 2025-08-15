@@ -1,7 +1,7 @@
-# AIandMan 🎨
+# AI & Man draw together🎨
 **AI-Powered Image Generation with Human Touch**
 
-Transform your creative ideas into stunning images with AIandMan - where AI meets human creativity. Powered by GPT-Image-1, this tool makes AI image generation and modification intuitive and efficient.
+No more waiting for AI generated one image at a time —AIandMan lets you generate multiple images in parallel, so you can review, select, and act on finished images while others continue processing in the background.
 
 ![Main Dashboard](screenshots/main-dashboard.png)
 *AI Image Generation at Your Fingertips*
