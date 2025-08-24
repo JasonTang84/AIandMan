@@ -91,11 +91,19 @@ def text_to_image_interface():
 
 def image_modification_interface():
     """Image-to-image upload and transformation interface"""   
+    
+    # Initialize clear state
+    if 'clear_images' not in st.session_state:
+        st.session_state.clear_images = False
+    
+    # Use a dynamic key that changes when clearing
+    file_key = f"image_files_{st.session_state.get('file_uploader_key', 0)}"
+    
     uploaded_files = st.file_uploader(
         "Choose image files",
         type=['png', 'jpg', 'jpeg'],
         accept_multiple_files=True,
-        key="image_files"
+        key=file_key
     )
     
     modification_prompt = st.text_area(
@@ -104,5 +112,13 @@ def image_modification_interface():
         height=80
     )
     
-    if uploaded_files and st.button("Transform Images", type="primary", use_container_width=True):
-        process_images(uploaded_files, modification_prompt)
+    if uploaded_files:
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            if st.button("Clear", type="secondary", use_container_width=True):
+                # Update the key to force file uploader to reset
+                st.session_state.file_uploader_key = st.session_state.get('file_uploader_key', 0) + 1
+                st.rerun()
+        with col2:
+            if st.button("Transform Images", type="primary", use_container_width=True):
+                process_images(uploaded_files, modification_prompt)
