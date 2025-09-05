@@ -82,6 +82,89 @@ def remove_failed_image(item_id):
         st.error(f"Error removing image: {str(e)}")
 
 
+def retry_timed_out_image(item_id):
+    """Retry generation for a timed-out image"""
+    try:
+        # Import here to avoid circular import
+        from background_tasks import thread_safe_log
+        from ai_integration import AIImageGenerator
+        from state_manager import update_item_by_id
+        
+        # Find the item by ID
+        item = None
+        for queue_item in st.session_state.review_queue:
+            if queue_item.get('id') == item_id:
+                item = queue_item
+                break
+        
+        if not item:
+            add_log("❌ Item not found for retry")
+            return
+        
+        if item.get('status') != 'timeout':
+            add_log("❌ Item is not in timeout status")
+            return
+        
+        # Initialize AI generator
+        try:
+            ai_generator = AIImageGenerator()
+        except Exception as e:
+            add_log(f"❌ Failed to initialize AI Generator: {str(e)}")
+            return
+        
+        # Reset item status to generating
+        update_item_by_id(item_id, {'status': 'generating', 'image': None})
+        
+        # Get quality and resolution settings
+        quality = getattr(st.session_state, 'image_quality', 'low')
+        resolution = getattr(st.session_state, 'image_resolution', '1024x1024')
+        
+        # Submit new background task based on item type
+        if item['type'] == 'text_to_image':
+            prompt = item['prompt']
+            future = st.session_state.executor.submit(
+                ai_generator.generate_from_text, 
+                prompt, 
+                size=resolution, 
+                quality=quality, 
+                logger_callback=thread_safe_log
+            )
+            task_description = f"Retry: {prompt[:40]}..."
+        else:  # image_to_image
+            source_image = item.get('original_image') or item.get('source_image')
+            modification_prompt = item.get('modification_prompt', '')
+            
+            if not source_image:
+                add_log("❌ No source image available for retry")
+                return
+                
+            future = st.session_state.executor.submit(
+                ai_generator.modify_image, 
+                source_image, 
+                modification_prompt, 
+                size=resolution, 
+                quality=quality, 
+                logger_callback=thread_safe_log
+            )
+            task_description = f"Retry transform: {modification_prompt[:40]}..."
+        
+        # Store future info for background checking
+        st.session_state.background_futures.append({
+            'future': future,
+            'prompt': task_description,
+            'item_id': item_id,
+            'type': item['type']
+        })
+        
+        add_log(f"🔄 Retrying generation: {task_description}")
+        st.success("🔄 Retrying image generation...")
+        st.rerun()
+        
+    except Exception as e:
+        add_log(f"❌ Error retrying image: {str(e)}")
+        st.error(f"Error retrying image: {str(e)}")
+
+
 def render_thumbnail_sidebar():
     """Render the right sidebar with thumbnail gallery"""
     # Check environment variable flag for loading mock data
@@ -158,8 +241,8 @@ def render_generating_thumbnail(i, item):
             render_thumbnail_caption(item)
         
         with col2:
-            # Add some vertical spacing to center the button with placeholder
-            st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+            # Minimal vertical spacing to align buttons with thumbnail
+            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
             
             # Add cancel/remove button based on status
             try:
@@ -176,8 +259,26 @@ def render_generating_thumbnail(i, item):
                     help="Cancel this image generation"
                 ):
                     cancel_generating_image(item_id)
+            elif status == 'timeout':
+                # For timeout status, show both retry and remove buttons
+                # Create two rows of buttons with minimal spacing
+                if st.button(
+                    "🔄", 
+                    key=f"retry_timeout_{item_id}_{timestamp}", 
+                    use_container_width=True,
+                    help="Retry this image generation"
+                ):
+                    retry_timed_out_image(item_id)
+                
+                if st.button(
+                    "🗑️", 
+                    key=f"remove_timeout_{item_id}_{timestamp}", 
+                    use_container_width=True,
+                    help="Remove this timeout image"
+                ):
+                    remove_failed_image(item_id)
             else:
-                # Remove button for failed/timeout/cancelled images
+                # Remove button for failed/cancelled images
                 if st.button(
                     "🗑️", 
                     key=f"remove_failed_{item_id}_{timestamp}", 
