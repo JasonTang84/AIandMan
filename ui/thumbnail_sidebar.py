@@ -260,23 +260,26 @@ def render_generating_thumbnail(i, item):
                 ):
                     cancel_generating_image(item_id)
             elif status == 'timeout':
-                # For timeout status, show both retry and remove buttons
-                # Create two rows of buttons with minimal spacing
-                if st.button(
-                    "🔄", 
-                    key=f"retry_timeout_{item_id}_{timestamp}", 
-                    use_container_width=True,
-                    help="Retry this image generation"
-                ):
-                    retry_timed_out_image(item_id)
+                # For timeout status, show retry and remove buttons side by side
+                col_retry, col_remove = st.columns(2)
                 
-                if st.button(
-                    "🗑️", 
-                    key=f"remove_timeout_{item_id}_{timestamp}", 
-                    use_container_width=True,
-                    help="Remove this timeout image"
-                ):
-                    remove_failed_image(item_id)
+                with col_retry:
+                    if st.button(
+                        "🔄", 
+                        key=f"retry_timeout_{item_id}_{timestamp}", 
+                        use_container_width=True,
+                        help="Retry this image generation"
+                    ):
+                        retry_timed_out_image(item_id)
+                
+                with col_remove:
+                    if st.button(
+                        "🗑️", 
+                        key=f"remove_timeout_{item_id}_{timestamp}", 
+                        use_container_width=True,
+                        help="Remove this timeout image"
+                    ):
+                        remove_failed_image(item_id)
             else:
                 # Remove button for failed/cancelled images
                 if st.button(

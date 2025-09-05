@@ -14,7 +14,7 @@ from ai_integration import AIImageGenerator
 from state_manager import add_log, update_item_by_id
 
 # Timeout settings
-TASK_TIMEOUT = 5  # 1 minute and 30 seconds
+TASK_TIMEOUT = 90  # 1 minute and 30 seconds
 
 # Thread-safe logging
 _log_lock = threading.Lock()
